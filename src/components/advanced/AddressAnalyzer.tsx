@@ -9,7 +9,12 @@ import { ShadingAnalyzer, ShadingData } from '../../services/shadingAnalyzer';
 import MapSelector from '../common/MapSelector';
 
 interface AddressAnalyzerProps {
-  onAddressAnalyzed: (address: AddressDetails, roofAnalysis: RoofAnalysis) => void;
+  onAddressAnalyzed: (address: AddressDetails, roofAnalysis: RoofAnalysis, additionalData?: {
+    pvgisData: any;
+    coordinates: [number, number];
+    buildingData: RoofAnalysisData;
+    shadingData: ShadingData;
+  }) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -24,6 +29,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
   const [buildingData, setBuildingData] = useState<RoofAnalysisData | null>(null);
   const [shadingData, setShadingData] = useState<ShadingData | null>(null);
   const [pvgisData, setPvgisData] = useState<any>(null);
+  const [realCoordinates, setRealCoordinates] = useState<[number, number] | null>(null);
   const [analysisSteps, setAnalysisSteps] = useState<string[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -38,6 +44,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
     setBuildingData(null);
     setShadingData(null);
     setPvgisData(null);
+    setRealCoordinates(coordinates);
     
     try {
       const [lng, lat] = coordinates;
@@ -136,6 +143,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
       addAnalysisStep('🎯 ¡Análisis completado con datos reales!');
 
       console.log('Real building analysis completed:', {
+        coordinates: [lat, lng],
         buildingData,
         shadingData: shadingAnalysis,
         pvgisData: optimalSolarData,
@@ -144,7 +152,14 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
 
       setSelectedAddress(addressDetails);
       setRoofAnalysis(finalRoofAnalysis);
-      onAddressAnalyzed(addressDetails, finalRoofAnalysis);
+      
+      // Pass ALL real data to the next step
+      onAddressAnalyzed(addressDetails, finalRoofAnalysis, {
+        pvgisData: optimalSolarData.optimal, // Pass the optimal PVGIS data
+        coordinates: [lat, lng], // Pass real coordinates
+        buildingData: buildingData!,
+        shadingData: shadingAnalysis
+      });
       
     } catch (error) {
       console.error('Error analyzing roof:', error);
@@ -246,6 +261,15 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
                   <p className="text-sm text-gris-hotspot-medio">Sin sombreado</p>
                 </div>
               </div>
+
+              {/* Real coordinates display */}
+              {realCoordinates && (
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-green-300">
+                    📍 Coordenadas reales: {realCoordinates[0].toFixed(6)}, {realCoordinates[1].toFixed(6)}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Building Details */}

@@ -14,6 +14,8 @@ interface PasoAnalisisAvanzadoProps {
     roofAnalysis: RoofAnalysis;
     householdProfile: HouseholdProfile;
     consumptionPrediction: ConsumptionPrediction;
+    pvgisData?: any;
+    coordinates?: [number, number];
   }) => void;
 }
 
@@ -25,11 +27,22 @@ const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
   onDataUpdate
 }) => {
   const [currentSubStep, setCurrentSubStep] = useState<'address' | 'household'>('address');
-  const [addressData, setAddressData] = useState<{ address: AddressDetails; roofAnalysis: RoofAnalysis } | null>(null);
+  const [addressData, setAddressData] = useState<{ 
+    address: AddressDetails; 
+    roofAnalysis: RoofAnalysis;
+    pvgisData?: any;
+    coordinates?: [number, number];
+  } | null>(null);
   const [householdData, setHouseholdData] = useState<{ profile: HouseholdProfile; prediction: ConsumptionPrediction } | null>(null);
 
-  const handleAddressAnalyzed = (address: AddressDetails, roofAnalysis: RoofAnalysis) => {
-    setAddressData({ address, roofAnalysis });
+  const handleAddressAnalyzed = (address: AddressDetails, roofAnalysis: RoofAnalysis, additionalData?: any) => {
+    const data = { 
+      address, 
+      roofAnalysis,
+      pvgisData: additionalData?.pvgisData,
+      coordinates: additionalData?.coordinates
+    };
+    setAddressData(data);
     setCurrentSubStep('household');
   };
 
@@ -41,7 +54,9 @@ const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
         address: addressData.address,
         roofAnalysis: addressData.roofAnalysis,
         householdProfile: profile,
-        consumptionPrediction: prediction
+        consumptionPrediction: prediction,
+        pvgisData: addressData.pvgisData,
+        coordinates: addressData.coordinates
       });
       onNext();
     }
