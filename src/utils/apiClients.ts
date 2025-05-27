@@ -1,4 +1,3 @@
-
 import { GooglePlacesResponse, GooglePlacesResult, PVGISResponse, ClimateData, ConsumptionProfileData } from '../types/ApiTypes';
 
 // API configuration - in production, these would come from environment variables
@@ -120,33 +119,92 @@ export class ApiClient {
     }
   }
 
-  // PVGIS API for real solar irradiance data
-  static async getSolarData(lat: number, lng: number, peakPower: number = 1): Promise<PVGISResponse> {
-    const cacheKey = `pvgis_${lat}_${lng}_${peakPower}`;
+  // PVGIS API for real solar irradiance data - NOW USES REAL COORDINATES
+  static async getSolarData(lat: number, lng: number, peakPower: number = 1, angle: number = 35, aspect: number = 0): Promise<PVGISResponse> {
+    const cacheKey = `pvgis_${lat.toFixed(4)}_${lng.toFixed(4)}_${peakPower}_${angle}_${aspect}`;
     if (cache.has(cacheKey)) {
+      console.log('Using cached PVGIS data for:', lat, lng);
       return cache.get(cacheKey);
     }
 
     try {
       await rateLimit();
       
-      const url = `${API_CONFIG.PVGIS_BASE_URL}/PVcalc?lat=${lat}&lon=${lng}&peakpower=${peakPower}&loss=14&angle=35&aspect=0&mountingplace=building&outputformat=json`;
+      console.log('Fetching REAL PVGIS data for coordinates:', lat, lng, 'with angle:', angle);
+      
+      const url = `${API_CONFIG.PVGIS_BASE_URL}/PVcalc?lat=${lat}&lon=${lng}&peakpower=${peakPower}&loss=14&angle=${angle}&aspect=${aspect}&mountingplace=building&outputformat=json`;
+      
+      console.log('PVGIS URL:', url);
       
       const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`PVGIS API Error: ${response.status}`);
+        console.warn(`PVGIS API Error: ${response.status}, falling back to mock data`);
+        return ApiClient.getMockPVGISData();
       }
       
       const data = await response.json();
+      
+      console.log('Real PVGIS data received:', data);
+      
+      // Validate PVGIS response
+      if (!data.outputs || !data.outputs.totals || !data.outputs.totals.fixed) {
+        console.warn('Invalid PVGIS response structure, using mock data');
+        return ApiClient.getMockPVGISData();
+      }
       
       cache.set(cacheKey, data);
       return data;
     } catch (error) {
       console.error('Error fetching PVGIS data:', error);
-      // Return mock data as fallback
+      console.log('Falling back to mock data');
       return ApiClient.getMockPVGISData();
     }
+  }
+
+  // Enhanced method to test multiple angles and find optimal inclination
+  static async getOptimalSolarData(lat: number, lng: number, peakPower: number = 1): Promise<{
+    optimal: PVGISResponse;
+    angle: number;
+    allAngles: Array<{ angle: number; yield: number; data: PVGISResponse }>;
+  }> {
+    const angles = [20, 25, 30, 35, 40, 45]; // Test multiple angles
+    const results = [];
+    
+    console.log('Testing multiple angles for optimal solar data...');
+    
+    for (const angle of angles) {
+      try {
+        const data = await this.getSolarData(lat, lng, peakPower, angle);
+        const yield = data.outputs.totals.fixed.E_y;
+        results.push({ angle, yield, data });
+        
+        console.log(`Angle ${angle}°: ${yield.toFixed(0)} kWh/kWp/year`);
+        
+        // Add delay to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error testing angle ${angle}:`, error);
+      }
+    }
+    
+    if (results.length === 0) {
+      const fallbackData = await this.getSolarData(lat, lng, peakPower, 35);
+      return { optimal: fallbackData, angle: 35, allAngles: [] };
+    }
+    
+    // Find optimal angle
+    const optimal = results.reduce((best, current) => 
+      current.yield > best.yield ? current : best
+    );
+    
+    console.log(`Optimal angle: ${optimal.angle}° with ${optimal.yield.toFixed(0)} kWh/kWp/year`);
+    
+    return {
+      optimal: optimal.data,
+      angle: optimal.angle,
+      allAngles: results
+    };
   }
 
   // Fallback mock PVGIS data
