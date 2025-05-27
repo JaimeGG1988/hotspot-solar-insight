@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { CalculadoraData, Orientacion } from '../../types/CalculadoraTypes';
+import MapSelector from '../common/MapSelector';
 
 interface PasoInstalacionProps {
   data: CalculadoraData;
@@ -20,135 +21,17 @@ const PasoInstalacion: React.FC<PasoInstalacionProps> = ({
   isLoading, 
   setIsLoading 
 }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null);
-  const [marker, setMarker] = useState<any>(null);
   const [errors, setErrors] = useState<string[]>([]);
-  const [searchAddress, setSearchAddress] = useState(data.instalacion.ubicacion);
 
-  // Inicializar mapa
-  useEffect(() => {
-    if (mapRef.current && !map && typeof window !== 'undefined' && (window as any).L) {
-      const L = (window as any).L;
-      
-      const newMap = L.map(mapRef.current).setView(
-        [data.instalacion.latitud, data.instalacion.longitud], 
-        13
-      );
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(newMap);
-
-      const newMarker = L.marker([data.instalacion.latitud, data.instalacion.longitud], {
-        draggable: true
-      }).addTo(newMap);
-
-      newMarker.on('dragend', (e: any) => {
-        const position = e.target.getLatLng();
-        updateData({
-          instalacion: {
-            ...data.instalacion,
-            latitud: position.lat,
-            longitud: position.lng
-          }
-        });
-        reverseGeocode(position.lat, position.lng);
-      });
-
-      newMap.on('click', (e: any) => {
-        const { lat, lng } = e.latlng;
-        newMarker.setLatLng([lat, lng]);
-        updateData({
-          instalacion: {
-            ...data.instalacion,
-            latitud: lat,
-            longitud: lng
-          }
-        });
-        reverseGeocode(lat, lng);
-      });
-
-      setMap(newMap);
-      setMarker(newMarker);
-    }
-  }, []);
-
-  // Actualizar posición del marcador cuando cambien las coordenadas
-  useEffect(() => {
-    if (map && marker) {
-      marker.setLatLng([data.instalacion.latitud, data.instalacion.longitud]);
-      map.setView([data.instalacion.latitud, data.instalacion.longitud], 13);
-    }
-  }, [data.instalacion.latitud, data.instalacion.longitud, map, marker]);
-
-  const searchLocation = async () => {
-    if (!searchAddress.trim()) return;
-
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=1`
-      );
-      const results = await response.json();
-
-      if (results.length > 0) {
-        const { lat, lon, display_name } = results[0];
-        updateData({
-          instalacion: {
-            ...data.instalacion,
-            latitud: parseFloat(lat),
-            longitud: parseFloat(lon),
-            ubicacion: display_name
-          }
-        });
-        setSearchAddress(display_name);
+  const handleLocationSelect = (coordinates: [number, number], address: string) => {
+    updateData({
+      instalacion: {
+        ...data.instalacion,
+        ubicacion: address,
+        latitud: coordinates[1], // lat
+        longitud: coordinates[0] // lng
       }
-    } catch (error) {
-      console.error('Error searching location:', error);
-    }
-  };
-
-  const reverseGeocode = async (lat: number, lng: number) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const result = await response.json();
-
-      if (result.display_name) {
-        updateData({
-          instalacion: {
-            ...data.instalacion,
-            ubicacion: result.display_name
-          }
-        });
-        setSearchAddress(result.display_name);
-      }
-    } catch (error) {
-      console.error('Error reverse geocoding:', error);
-    }
-  };
-
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          updateData({
-            instalacion: {
-              ...data.instalacion,
-              latitud: lat,
-              longitud: lng
-            }
-          });
-          reverseGeocode(lat, lng);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-        }
-      );
-    }
+    });
   };
 
   const validateAndNext = async () => {
@@ -168,24 +51,7 @@ const PasoInstalacion: React.FC<PasoInstalacionProps> = ({
       try {
         setIsLoading(true);
         
-        // Llamar al backend para obtener recomendaciones
-        const payload = {
-          tipoCliente: 'residencial',
-          tipoEntradaConsumo: data.consumo.tipoEntrada,
-          consumoAnual: data.consumo.consumoAnual,
-          consumosMensuales: data.consumo.consumosMensuales,
-          tipoPerfilUsuario: data.consumo.perfilUsuario,
-          tieneVE: data.consumo.tieneVE,
-          tieneBombaCalor: data.consumo.tieneBombaCalor,
-          nombreArchivoCSV: data.consumo.nombreArchivoCSV,
-          ubicacion: data.instalacion.ubicacion,
-          latitud: data.instalacion.latitud,
-          longitud: data.instalacion.longitud,
-          orientacion: data.instalacion.orientacion,
-          inclinacion: data.instalacion.inclinacion
-        };
-
-        // Simular llamada al backend (reemplazar con llamada real)
+        // Simular llamada al backend para obtener recomendaciones
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Datos simulados de respuesta
@@ -228,54 +94,15 @@ const PasoInstalacion: React.FC<PasoInstalacionProps> = ({
       </div>
 
       <div className="space-y-6">
-        {/* Búsqueda de ubicación */}
-        <div className="space-y-4">
-          <label className="block text-lg font-semibold text-white">
-            Ubicación de la instalación
-          </label>
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              placeholder="Introduce dirección o ciudad"
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
-              className="input-premium flex-1"
-              onKeyPress={(e) => e.key === 'Enter' && searchLocation()}
-            />
-            <button
-              onClick={searchLocation}
-              className="px-4 py-3 bg-cobre-hotspot-plano text-white rounded-xl hover:bg-cobre-hotspot-oscuro transition-colors duration-300"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={getCurrentLocation}
-              className="px-4 py-3 bg-gris-hotspot-profundo text-white rounded-xl hover:bg-gris-hotspot-medio transition-colors duration-300"
-              title="Usar mi ubicación actual"
-            >
-              <Navigation className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mapa */}
-        <div className="space-y-2">
-          <label className="block text-lg font-semibold text-white">
-            Selecciona la ubicación exacta en el mapa
-          </label>
-          <div 
-            ref={mapRef} 
-            className="h-64 w-full rounded-xl border border-white/20 bg-gris-hotspot-profundo"
-            style={{ minHeight: '300px' }}
-          >
-            <div className="flex items-center justify-center h-full text-gris-hotspot-medio">
-              Cargando mapa...
-            </div>
-          </div>
-          <p className="text-sm text-gris-hotspot-medio">
-            Haz clic en el mapa o arrastra el marcador para ajustar la ubicación
-          </p>
-        </div>
+        {/* Mapa interactivo */}
+        <MapSelector
+          onLocationSelect={handleLocationSelect}
+          initialCoordinates={data.instalacion.latitud && data.instalacion.longitud ? 
+            [data.instalacion.longitud, data.instalacion.latitud] : undefined
+          }
+          initialAddress={data.instalacion.ubicacion}
+          showTokenInput={true}
+        />
 
         {/* Coordenadas */}
         <div className="grid grid-cols-2 gap-4">

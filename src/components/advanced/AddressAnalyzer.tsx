@@ -1,9 +1,9 @@
-
 import React, { useState, useCallback } from 'react';
-import { MapPin, Search, Satellite, Zap, AlertCircle } from 'lucide-react';
+import { Satellite, Zap, AlertCircle } from 'lucide-react';
 import { AddressDetails, RoofAnalysis } from '../../types/AdvancedTypes';
 import { ApiClient } from '../../utils/apiClients';
 import { SolarCalculations } from '../../utils/solarCalculations';
+import MapSelector from '../common/MapSelector';
 
 interface AddressAnalyzerProps {
   onAddressAnalyzed: (address: AddressDetails, roofAnalysis: RoofAnalysis) => void;
@@ -16,43 +16,33 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
   isLoading,
   setIsLoading
 }) => {
-  const [address, setAddress] = useState('');
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<AddressDetails | null>(null);
   const [roofAnalysis, setRoofAnalysis] = useState<RoofAnalysis | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const searchAddresses = useCallback(async (query: string) => {
-    if (query.length < 3) {
-      setAddressSuggestions([]);
-      return;
-    }
-
-    try {
-      setApiError(null);
-      const response = await ApiClient.searchAddresses(query);
-      setAddressSuggestions(response.predictions || []);
-    } catch (error) {
-      console.error('Error searching addresses:', error);
-      setApiError('Error al buscar direcciones. Inténtalo de nuevo.');
-      setAddressSuggestions([]);
-    }
-  }, []);
-
-  const analyzeRoof = async (addressDetails: AddressDetails) => {
+  const analyzeRoof = async (coordinates: [number, number], address: string) => {
     setIsLoading(true);
     setApiError(null);
     
     try {
-      // Get coordinates from address
-      const lat = 40.4168 + (Math.random() - 0.5) * 0.1; // Mock coordinates near Madrid
-      const lng = -3.7038 + (Math.random() - 0.5) * 0.1;
+      const [lng, lat] = coordinates;
       
       // Get real solar data from PVGIS
       console.log('Fetching PVGIS data for coordinates:', lat, lng);
       const pvgisData = await ApiClient.getSolarData(lat, lng, 1);
       console.log('PVGIS data received:', pvgisData);
       
+      // Create address details from the selected address
+      const addressDetails: AddressDetails = {
+        fullAddress: address,
+        street: '', // Could be extracted from geocoding result
+        number: '',
+        postalCode: '',
+        city: '',
+        province: '',
+        country: 'España'
+      };
+
       // Calculate roof characteristics based on location and PVGIS data
       const baseArea = 45 + Math.random() * 30; // 45-75 m²
       const usableArea = baseArea * (0.8 + Math.random() * 0.15); // 80-95% usable
@@ -77,7 +67,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
             orientation: orientation + (Math.random() - 0.5) * 20,
             inclination: inclination + (Math.random() - 0.5) * 10,
             shadingFactor: shadingFactor,
-            panelCount: Math.floor((usableArea * 0.8) / 2.3) // 2.3 m² per panel
+            panelCount: Math.floor((usableArea * 0.8) / 2.3)
           },
           {
             id: 'secondary',
@@ -90,10 +80,10 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
         ]
       };
 
-      // Log the analysis for debugging
       console.log('Roof analysis completed:', mockRoofAnalysis);
       console.log('Annual solar yield from PVGIS:', pvgisData.outputs.totals.fixed.E_y, 'kWh/kWp');
 
+      setSelectedAddress(addressDetails);
       setRoofAnalysis(mockRoofAnalysis);
       onAddressAnalyzed(addressDetails, mockRoofAnalysis);
       
@@ -102,34 +92,6 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
       setApiError('Error al analizar el tejado. Los datos pueden no estar disponibles para esta ubicación.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const selectAddress = async (suggestion: any) => {
-    try {
-      setApiError(null);
-      
-      // Get detailed address information
-      const details = await ApiClient.getAddressDetails(suggestion.place_id);
-      
-      const addressDetails: AddressDetails = {
-        fullAddress: details.formatted_address,
-        street: details.address_components.find(c => c.types.includes('route'))?.long_name || '',
-        number: details.address_components.find(c => c.types.includes('street_number'))?.long_name || '',
-        postalCode: details.address_components.find(c => c.types.includes('postal_code'))?.long_name || '',
-        city: details.address_components.find(c => c.types.includes('locality'))?.long_name || '',
-        province: details.address_components.find(c => c.types.includes('administrative_area_level_1'))?.long_name || '',
-        country: details.address_components.find(c => c.types.includes('country'))?.long_name || 'España'
-      };
-
-      setSelectedAddress(addressDetails);
-      setAddress(details.formatted_address);
-      setAddressSuggestions([]);
-      await analyzeRoof(addressDetails);
-      
-    } catch (error) {
-      console.error('Error selecting address:', error);
-      setApiError('Error al obtener los detalles de la dirección.');
     }
   };
 
@@ -143,7 +105,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
           Análisis Avanzado del Tejado
         </h2>
         <p className="text-gris-hotspot-medio">
-          Introduce tu dirección para analizar automáticamente el potencial solar de tu tejado usando datos reales
+          Selecciona tu ubicación en el mapa interactivo para analizar automáticamente el potencial solar de tu tejado
         </p>
       </div>
 
@@ -156,48 +118,12 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
           </div>
         )}
 
-        {/* Address Search */}
-        <div className="space-y-4">
-          <label className="block text-lg font-semibold text-white">
-            Dirección completa de la vivienda
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Introduce tu dirección completa (calle, número, ciudad...)"
-              value={address}
-              onChange={(e) => {
-                setAddress(e.target.value);
-                searchAddresses(e.target.value);
-              }}
-              className="input-premium w-full pl-12"
-            />
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gris-hotspot-medio" />
-          </div>
-
-          {/* Address Suggestions */}
-          {addressSuggestions.length > 0 && (
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 max-h-60 overflow-y-auto">
-              {addressSuggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => selectAddress(suggestion)}
-                  className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors duration-200 border-b border-white/10 last:border-b-0"
-                >
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-4 h-4 text-cobre-hotspot-claro flex-shrink-0" />
-                    <div>
-                      <p className="text-white font-medium">{suggestion.structured_formatting?.main_text || suggestion.description}</p>
-                      <p className="text-sm text-gris-hotspot-medio">
-                        {suggestion.structured_formatting?.secondary_text || ''}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Mapa interactivo */}
+        <MapSelector
+          onLocationSelect={analyzeRoof}
+          initialCoordinates={selectedAddress ? undefined : [-3.7038, 40.4168]}
+          showTokenInput={true}
+        />
 
         {/* Loading State */}
         {isLoading && (
@@ -274,13 +200,13 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
 
         {/* Information Card */}
         <div className="bg-azul-hotspot/30 border border-azul-hotspot/50 rounded-xl p-6">
-          <h4 className="font-semibold text-white mb-3">✨ Nuevas funcionalidades con datos reales:</h4>
+          <h4 className="font-semibold text-white mb-3">🗺️ Nuevo Mapa Interactivo:</h4>
           <ul className="space-y-2 text-sm text-gris-hotspot-medio">
-            <li>• <strong>PVGIS API:</strong> Datos oficiales de irradiación solar de la Comisión Europea</li>
-            <li>• <strong>Geocodificación avanzada:</strong> Coordenadas precisas para cálculos exactos</li>
-            <li>• <strong>Análisis mejorado:</strong> Factores climáticos y topográficos reales</li>
-            <li>• <strong>Caché inteligente:</strong> Optimización de consultas para mejor rendimiento</li>
-            <li>• <strong>Gestión de errores:</strong> Datos de respaldo en caso de fallos de API</li>
+            <li>• <strong>Mapbox GL JS:</strong> Mapas de alta calidad con vista satelital</li>
+            <li>• <strong>Búsqueda inteligente:</strong> Encuentra cualquier dirección en España</li>
+            <li>• <strong>Geolocalización:</strong> Usa tu ubicación actual automáticamente</li>
+            <li>• <strong>Marcador arrastrable:</strong> Ajusta la posición con precisión</li>
+            <li>• <strong>Integración PVGIS:</strong> Datos solares reales para tu ubicación exacta</li>
           </ul>
         </div>
       </div>
