@@ -49,11 +49,15 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
       
       if (!building) {
         addAnalysisStep('⚠️ No se encontró edificio en las coordenadas. Usando estimación...');
-        // Create mock building data
+        // Create mock building data with properly typed geometry
         const mockBuilding = {
           id: 'estimated',
-          geometry: [[lng - 0.0001, lat - 0.0001], [lng + 0.0001, lat - 0.0001], 
-                    [lng + 0.0001, lat + 0.0001], [lng - 0.0001, lat + 0.0001]],
+          geometry: [
+            [lng - 0.0001, lat - 0.0001] as [number, number], 
+            [lng + 0.0001, lat - 0.0001] as [number, number], 
+            [lng + 0.0001, lat + 0.0001] as [number, number], 
+            [lng - 0.0001, lat + 0.0001] as [number, number]
+          ],
           tags: { building: 'house' },
           center: [lng, lat] as [number, number],
           area: 120, // m²
