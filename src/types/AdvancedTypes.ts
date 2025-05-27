@@ -1,4 +1,6 @@
 
+import { Resultados } from './CalculadoraTypes';
+
 // Advanced types for the enhanced solar calculator
 export interface AddressDetails {
   fullAddress: string;
@@ -91,7 +93,7 @@ export interface SubsidyInfo {
   requirements: string[];
 }
 
-export interface AdvancedResults extends Resultados {
+export interface AdvancedResultsType extends Resultados {
   roofAnalysis: RoofAnalysis;
   consumptionPrediction: ConsumptionPrediction;
   financialAnalysis: FinancialAnalysis;

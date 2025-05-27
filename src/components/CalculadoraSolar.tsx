@@ -7,7 +7,7 @@ import PasoTecnico from './steps/PasoTecnico';
 import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
 import { CalculadoraData, defaultCalculadoraData } from '../types/CalculadoraTypes';
-import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResults as AdvancedResultsType } from '../types/AdvancedTypes';
+import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResultsType } from '../types/AdvancedTypes';
 
 const CalculadoraSolar = () => {
   const [currentStep, setCurrentStep] = useState(1);

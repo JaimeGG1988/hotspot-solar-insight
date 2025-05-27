@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { AdvancedResults } from '../../types/AdvancedTypes';
+import type { AdvancedResultsType } from '../../types/AdvancedTypes';
 import { TrendingUp, DollarSign, Leaf, Download, Share2, Calculator } from 'lucide-react';
 
 interface AdvancedResultsProps {
-  results: AdvancedResults;
+  results: AdvancedResultsType;
   onNewCalculation: () => void;
 }
 
@@ -147,7 +147,7 @@ const AdvancedResults: React.FC<AdvancedResultsProps> = ({ results, onNewCalcula
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-blue-400 mb-2">
-              {((results.subsidies.totalAmount / results.costeTotalInstalacion_eur) * 100).toFixed(0)}%
+              {((results.subsidies.totalAmount / results.financialAnalysis.systemCost) * 100).toFixed(0)}%
             </p>
             <p className="text-gris-hotspot-medio">Descuento</p>
           </div>
