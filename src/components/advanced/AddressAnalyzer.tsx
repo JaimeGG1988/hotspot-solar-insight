@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Satellite, Zap, AlertCircle } from 'lucide-react';
 import { AddressDetails, RoofAnalysis } from '../../types/AdvancedTypes';
@@ -122,7 +123,6 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
         <MapSelector
           onLocationSelect={analyzeRoof}
           initialCoordinates={selectedAddress ? undefined : [-3.7038, 40.4168]}
-          showTokenInput={true}
         />
 
         {/* Loading State */}
@@ -185,7 +185,7 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
                   </div>
                   <div>
                     <span className="text-gris-hotspot-medio">Fuente:</span>
-                    <span className="text-white ml-2">PVGIS + Análisis satelital</span>
+                    <span className="text-white ml-2">PVGIS + OpenStreetMap</span>
                   </div>
                 </div>
               </div>
@@ -197,18 +197,6 @@ const AddressAnalyzer: React.FC<AddressAnalyzerProps> = ({
             </div>
           </div>
         )}
-
-        {/* Information Card */}
-        <div className="bg-azul-hotspot/30 border border-azul-hotspot/50 rounded-xl p-6">
-          <h4 className="font-semibold text-white mb-3">🗺️ Nuevo Mapa Interactivo:</h4>
-          <ul className="space-y-2 text-sm text-gris-hotspot-medio">
-            <li>• <strong>Mapbox GL JS:</strong> Mapas de alta calidad con vista satelital</li>
-            <li>• <strong>Búsqueda inteligente:</strong> Encuentra cualquier dirección en España</li>
-            <li>• <strong>Geolocalización:</strong> Usa tu ubicación actual automáticamente</li>
-            <li>• <strong>Marcador arrastrable:</strong> Ajusta la posición con precisión</li>
-            <li>• <strong>Integración PVGIS:</strong> Datos solares reales para tu ubicación exacta</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

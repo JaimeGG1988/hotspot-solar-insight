@@ -101,7 +101,6 @@ const PasoInstalacion: React.FC<PasoInstalacionProps> = ({
             [data.instalacion.longitud, data.instalacion.latitud] : undefined
           }
           initialAddress={data.instalacion.ubicacion}
-          showTokenInput={true}
         />
 
         {/* Coordenadas */}
