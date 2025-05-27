@@ -94,7 +94,8 @@ export class BuildingAnalyzer {
   }
 
   private static processBuilding(building: any): BuildingData {
-    const geometry = building.geometry.map((point: any) => [point.lon, point.lat]);
+    // Ensure geometry is properly typed as [number, number] tuples
+    const geometry: Array<[number, number]> = building.geometry.map((point: any) => [point.lon, point.lat] as [number, number]);
     const center = this.calculatePolygonCenter(building.geometry);
     
     // Extract building properties

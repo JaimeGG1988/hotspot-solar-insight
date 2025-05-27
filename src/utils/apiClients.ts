@@ -166,7 +166,7 @@ export class ApiClient {
   static async getOptimalSolarData(lat: number, lng: number, peakPower: number = 1): Promise<{
     optimal: PVGISResponse;
     angle: number;
-    allAngles: Array<{ angle: number; yield: number; data: PVGISResponse }>;
+    allAngles: Array<{ angle: number; energyYield: number; data: PVGISResponse }>;
   }> {
     const angles = [20, 25, 30, 35, 40, 45]; // Test multiple angles
     const results = [];
@@ -176,10 +176,10 @@ export class ApiClient {
     for (const angle of angles) {
       try {
         const data = await this.getSolarData(lat, lng, peakPower, angle);
-        const yield = data.outputs.totals.fixed.E_y;
-        results.push({ angle, yield, data });
+        const energyYield = data.outputs.totals.fixed.E_y;
+        results.push({ angle, energyYield, data });
         
-        console.log(`Angle ${angle}°: ${yield.toFixed(0)} kWh/kWp/year`);
+        console.log(`Angle ${angle}°: ${energyYield.toFixed(0)} kWh/kWp/year`);
         
         // Add delay to respect API limits
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -195,10 +195,10 @@ export class ApiClient {
     
     // Find optimal angle
     const optimal = results.reduce((best, current) => 
-      current.yield > best.yield ? current : best
+      current.energyYield > best.energyYield ? current : best
     );
     
-    console.log(`Optimal angle: ${optimal.angle}° with ${optimal.yield.toFixed(0)} kWh/kWp/year`);
+    console.log(`Optimal angle: ${optimal.angle}° with ${optimal.energyYield.toFixed(0)} kWh/kWp/year`);
     
     return {
       optimal: optimal.data,
