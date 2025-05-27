@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -19,6 +20,19 @@ export default {
 		},
 		extend: {
 			colors: {
+				// HotSpot360 Brand Colors
+				'azul-hotspot': '#1b2432',
+				'cobre-hotspot': {
+					'plano': '#b67650',
+					'claro': '#e0a878', 
+					'oscuro': '#5a3a2a'
+				},
+				'gris-hotspot': {
+					'profundo': '#3F4752',
+					'medio': '#7D8590',
+					'claro': '#DDE1E5'
+				},
+				// Original shadcn colors
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -84,11 +98,45 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				// HotSpot360 custom animations
+				'float': {
+					'0%, 100%': { transform: 'translateY(0px)' },
+					'50%': { transform: 'translateY(-20px)' }
+				},
+				'pulse-glow': {
+					'0%, 100%': { 
+						boxShadow: '0 0 20px rgba(182, 118, 80, 0.3), 0 0 40px rgba(182, 118, 80, 0.1)' 
+					},
+					'50%': { 
+						boxShadow: '0 0 30px rgba(182, 118, 80, 0.6), 0 0 60px rgba(182, 118, 80, 0.2)' 
+					}
+				},
+				'shimmer': {
+					'0%': { transform: 'translateX(-100%)' },
+					'100%': { transform: 'translateX(100%)' }
+				},
+				'gradient': {
+					'0%, 100%': {
+						'background-size': '200% 200%',
+						'background-position': 'left center'
+					},
+					'50%': {
+						'background-size': '200% 200%',
+						'background-position': 'right center'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'float': 'float 6s ease-in-out infinite',
+				'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+				'shimmer': 'shimmer 2s linear infinite',
+				'gradient': 'gradient 3s ease infinite'
+			},
+			boxShadow: {
+				'4xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
 			}
 		}
 	},

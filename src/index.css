@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -35,47 +36,32 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
@@ -96,6 +82,43 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-inter;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-inter {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-cobre-hotspot-claro to-cobre-hotspot-plano bg-clip-text text-transparent;
+  }
+  
+  .btn-premium {
+    @apply relative overflow-hidden rounded-xl px-8 py-4 font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-lg;
+    background: linear-gradient(135deg, #b67650 0%, #e0a878 50%, #b67650 100%);
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+  
+  .btn-premium::before {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(255,255,255,0.2) 100%);
+  }
+  
+  .btn-premium:hover::before {
+    @apply opacity-100;
+    animation: shimmer 1s ease-in-out;
+  }
+  
+  .card-premium {
+    @apply backdrop-blur-xl rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl transition-all duration-300 hover:bg-white/10 hover:shadow-4xl;
+  }
+  
+  .input-premium {
+    @apply w-full rounded-xl border border-gris-hotspot-claro bg-white/90 px-4 py-3 text-gris-hotspot-profundo placeholder:text-gris-hotspot-medio focus:border-cobre-hotspot-plano focus:outline-none focus:ring-2 focus:ring-cobre-hotspot-plano/20 transition-all duration-300;
   }
 }
