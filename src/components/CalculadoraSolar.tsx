@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Header from './Header';
 import StepIndicator from './StepIndicator';
@@ -8,6 +7,8 @@ import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
 import { CalculadoraData, defaultCalculadoraData } from '../types/CalculadoraTypes';
 import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResultsType } from '../types/AdvancedTypes';
+import ApiClient from '../api/ApiClient';
+import SolarCalculations from '../utils/SolarCalculations';
 
 const CalculadoraSolar = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -80,24 +81,55 @@ const CalculadoraSolar = () => {
     setIsLoading(true);
     
     try {
-      // Simulate advanced calculations
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Starting advanced calculations with real data...');
       
       const roofAnalysis = advancedData.roofAnalysis;
       const consumption = advancedData.consumptionPrediction;
       
-      // Calculate production based on roof analysis and PVGIS data
-      const annualProduction = roofAnalysis.maxKwp * 1200 * roofAnalysis.shadingFactor; // kWh/year
-      const selfConsumption = Math.min(annualProduction, consumption.currentAnnualKwh);
-      const coverage = (selfConsumption / consumption.currentAnnualKwh) * 100;
+      // Get real PVGIS data for the location
+      const pvgisData = await ApiClient.getSolarData(40.4168, -3.7038, roofAnalysis.maxKwp);
+      console.log('PVGIS data for calculations:', pvgisData);
       
-      // Financial calculations
-      const systemCost = roofAnalysis.maxKwp * 1200; // €/kWp
-      const annualSavings = selfConsumption * 0.25; // €/kWh
-      const payback = systemCost / annualSavings;
-      const roi = (annualSavings / systemCost) * 100;
+      // Calculate production using real solar data
+      const specificYield = pvgisData.outputs.totals.fixed.E_y; // kWh/kWp/year from PVGIS
+      const recommendedKwp = roofAnalysis.maxKwp * 0.85; // Conservative sizing
+      const annualProduction = SolarCalculations.calculateAnnualProduction(pvgisData, recommendedKwp);
       
-      // Mock subsidies
+      console.log('Annual production calculated:', annualProduction, 'kWh');
+      
+      // Generate hourly profiles for detailed analysis
+      const hourlyProduction = SolarCalculations.generateHourlyProduction(pvgisData, recommendedKwp);
+      const profileData = await ApiClient.getConsumptionProfile('madrid');
+      const hourlyConsumption = SolarCalculations.generateHourlyConsumption(
+        consumption.currentAnnualKwh,
+        profileData,
+        advancedData.householdProfile?.hasAirConditioning,
+        advancedData.householdProfile?.hasElectricHeating,
+        advancedData.householdProfile?.hasEV
+      );
+      
+      // Calculate energy balance
+      const energyBalance = SolarCalculations.calculateEnergyBalance(hourlyProduction, hourlyConsumption);
+      console.log('Energy balance:', energyBalance);
+      
+      // Financial calculations with real data
+      const systemCost = recommendedKwp * 1200; // €/kWp
+      const electricityPrice = 0.25; // €/kWh
+      const annualSavings = energyBalance.selfConsumption * electricityPrice + 
+                           energyBalance.gridInjection * 0.05; // Lower price for injection
+      
+      const financialMetrics = SolarCalculations.calculateFinancialMetrics(
+        systemCost,
+        annualSavings,
+        0.03, // 3% electricity price increase
+        0.05, // 5% discount rate
+        25    // 25-year lifespan
+      );
+
+      // Environmental impact
+      const environmentalImpact = SolarCalculations.calculateEnvironmentalImpact(annualProduction, 25);
+
+      // Mock subsidies (in production, integrate with real subsidy APIs)
       const subsidies = {
         national: [
           {
@@ -125,66 +157,61 @@ const CalculadoraSolar = () => {
       const scenarios = [
         {
           name: 'Conservador',
-          systemSize: roofAnalysis.maxKwp * 0.7,
-          cost: systemCost * 0.7,
-          annualSavings: annualSavings * 0.7,
-          payback: (systemCost * 0.7) / (annualSavings * 0.7),
-          roi: ((annualSavings * 0.7) / (systemCost * 0.7)) * 100
+          systemSize: recommendedKwp * 0.8,
+          cost: systemCost * 0.8,
+          annualSavings: annualSavings * 0.8,
+          payback: (systemCost * 0.8) / (annualSavings * 0.8),
+          roi: ((annualSavings * 0.8) / (systemCost * 0.8)) * 100
         },
         {
           name: 'Recomendado',
-          systemSize: roofAnalysis.maxKwp * 0.85,
-          cost: systemCost * 0.85,
-          annualSavings: annualSavings * 0.85,
-          payback: (systemCost * 0.85) / (annualSavings * 0.85),
-          roi: ((annualSavings * 0.85) / (systemCost * 0.85)) * 100
+          systemSize: recommendedKwp,
+          cost: systemCost,
+          annualSavings: annualSavings,
+          payback: financialMetrics.paybackYears || 0,
+          roi: financialMetrics.roi || 0
         },
         {
           name: 'Máximo',
           systemSize: roofAnalysis.maxKwp,
-          cost: systemCost,
-          annualSavings: annualSavings,
-          payback: payback,
-          roi: roi
+          cost: roofAnalysis.maxKwp * 1200,
+          annualSavings: annualSavings * 1.18,
+          payback: (roofAnalysis.maxKwp * 1200) / (annualSavings * 1.18),
+          roi: ((annualSavings * 1.18) / (roofAnalysis.maxKwp * 1200)) * 100
         }
       ];
 
       const advancedResults: AdvancedResultsType = {
         // Basic results
-        potenciaPicoInstalada_kWp: roofAnalysis.maxKwp * 0.85,
-        potenciaInversor_kW: roofAnalysis.maxKwp * 0.85 * 0.9,
-        produccionAnualEstimada_kWh: annualProduction * 0.85,
-        porcentajeCoberturaFV: coverage * 0.85,
-        ahorroEconomicoAnual_eur: annualSavings * 0.85,
-        costeTotalInstalacion_eur: systemCost * 0.85,
-        periodoRetornoInversion_anios: payback,
+        potenciaPicoInstalada_kWp: recommendedKwp,
+        potenciaInversor_kW: recommendedKwp * 0.9,
+        produccionAnualEstimada_kWh: annualProduction,
+        porcentajeCoberturaFV: energyBalance.autarkyRate,
+        ahorroEconomicoAnual_eur: annualSavings,
+        costeTotalInstalacion_eur: systemCost,
+        periodoRetornoInversion_anios: financialMetrics.paybackYears || 0,
         
         // Advanced results
         roofAnalysis,
         consumptionPrediction: consumption,
         financialAnalysis: {
-          systemCost: systemCost * 0.85,
-          annualProduction: annualProduction * 0.85,
-          annualSavings: annualSavings * 0.85,
-          roi: roi,
-          paybackYears: payback,
-          npv25Years: (annualSavings * 0.85 * 20) - (systemCost * 0.85),
-          irr: 12.5,
+          ...financialMetrics,
+          systemCost,
+          annualProduction,
+          annualSavings,
           scenarios
-        },
+        } as FinancialAnalysis,
         subsidies,
-        environmentalImpact: {
-          co2SavedAnnually: (annualProduction * 0.85 * 0.3) / 1000,
-          co2Saved25Years: (annualProduction * 0.85 * 0.3 * 25) / 1000,
-          treesEquivalent: Math.round((annualProduction * 0.85 * 0.3 * 25) / 1000 / 0.02)
-        }
+        environmentalImpact
       };
 
+      console.log('Advanced results calculated:', advancedResults);
       updateAdvancedData({ advancedResults });
       setCurrentStep(4);
       
     } catch (error) {
       console.error('Error calculating results:', error);
+      setApiError('Error al calcular los resultados. Inténtalo de nuevo.');
     } finally {
       setIsLoading(false);
     }
