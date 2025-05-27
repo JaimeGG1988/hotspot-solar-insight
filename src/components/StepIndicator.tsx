@@ -8,11 +8,10 @@ interface StepIndicatorProps {
 }
 
 const stepNames = [
-  'Consumo',
-  'Instalación',
-  'Técnico',
-  'Económico',
-  'Resultados'
+  'Análisis Avanzado',
+  'Configuración Técnica',
+  'Análisis Económico',
+  'Resultados Completos'
 ];
 
 const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, totalSteps }) => {
@@ -23,7 +22,6 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, totalSteps }
           const stepNumber = index + 1;
           const isCompleted = stepNumber < currentStep;
           const isCurrent = stepNumber === currentStep;
-          const isUpcoming = stepNumber > currentStep;
 
           return (
             <React.Fragment key={stepNumber}>
@@ -55,7 +53,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, totalSteps }
                 {/* Nombre del paso */}
                 <span
                   className={`
-                    text-sm font-medium transition-all duration-300
+                    text-sm font-medium transition-all duration-300 text-center max-w-24
                     ${isCompleted 
                       ? 'text-cobre-hotspot-claro' 
                       : isCurrent 
