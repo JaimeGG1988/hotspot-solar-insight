@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from './Header';
 import StepIndicator from './StepIndicator';
@@ -6,9 +7,9 @@ import PasoTecnico from './steps/PasoTecnico';
 import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
 import { CalculadoraData, defaultCalculadoraData } from '../types/CalculadoraTypes';
-import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResultsType } from '../types/AdvancedTypes';
-import ApiClient from '../api/ApiClient';
-import SolarCalculations from '../utils/SolarCalculations';
+import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResultsType, FinancialAnalysis } from '../types/AdvancedTypes';
+import { ApiClient } from '../utils/apiClients';
+import { SolarCalculations } from '../utils/solarCalculations';
 
 const CalculadoraSolar = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -211,7 +212,8 @@ const CalculadoraSolar = () => {
       
     } catch (error) {
       console.error('Error calculating results:', error);
-      setApiError('Error al calcular los resultados. Inténtalo de nuevo.');
+      // Simple error handling without setApiError
+      alert('Error al calcular los resultados. Inténtalo de nuevo.');
     } finally {
       setIsLoading(false);
     }
