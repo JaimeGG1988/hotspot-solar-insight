@@ -1,18 +1,17 @@
+// src/utils/apiClients.ts
 import { GooglePlacesResponse, GooglePlacesResult, PVGISResponse, ClimateData, ConsumptionProfileData } from '../types/ApiTypes';
 
-// API configuration - in production, these would come from environment variables
+// API configuration
 const API_CONFIG = {
-  GOOGLE_PLACES_KEY: 'YOUR_GOOGLE_PLACES_API_KEY', // User should replace this
-  PVGIS_PROXY_URL: '/api/pvgis', // Our serverless proxy
+  GOOGLE_PLACES_KEY: 'YOUR_GOOGLE_PLACES_API_KEY',
+  PVGIS_PROXY_URL: '/api/pvgis',
   NOMINATIM_URL: 'https://nominatim.openstreetmap.org',
-  RATE_LIMIT_DELAY: 1000 // 1 second between requests
+  RATE_LIMIT_DELAY: 1000
 };
 
-// Simple cache to avoid repeated API calls
 const cache = new Map<string, any>();
-
-// Rate limiting utility
 let lastRequestTime = 0;
+
 const rateLimit = async () => {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -23,29 +22,30 @@ const rateLimit = async () => {
 };
 
 export class ApiClient {
-  // Google Places API for address search
   static async searchAddresses(query: string): Promise<GooglePlacesResponse> {
+    console.log("API_CLIENT: searchAddresses llamado con query:", query); // LOG AÑADIDO
     const cacheKey = `places_${query}`;
     if (cache.has(cacheKey)) {
+      console.log("API_CLIENT: Devolviendo desde caché para searchAddresses:", query); // LOG AÑADIDO
       return cache.get(cacheKey);
     }
 
     try {
       await rateLimit();
       
-      // For demo purposes, we'll use Nominatim as fallback
-      // In production, replace with Google Places API
-      const response = await fetch(
-        `${API_CONFIG.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(query)}&countrycodes=es&limit=5&addressdetails=1`
-      );
+      const url = `${API_CONFIG.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(query)}&countrycodes=es&limit=5&addressdetails=1`;
+      console.log("API_CLIENT: URL de Nominatim construida (searchAddresses):", url); // LOG AÑADIDO
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
+        console.error("API_CLIENT: Error en respuesta de Nominatim (searchAddresses):", response.status, response.statusText); // LOG AÑADIDO
         throw new Error(`API Error: ${response.status}`);
       }
       
       const nominatimResults = await response.json();
+      console.log("API_CLIENT: Respuesta cruda de Nominatim (searchAddresses):", nominatimResults); // LOG AÑADIDO
       
-      // Convert Nominatim response to Google Places format
       const googlePlacesFormat: GooglePlacesResponse = {
         predictions: nominatimResults.map((result: any) => ({
           description: result.display_name,
@@ -58,37 +58,42 @@ export class ApiClient {
         status: 'OK'
       };
 
+      console.log("API_CLIENT: Datos formateados (searchAddresses):", googlePlacesFormat); // LOG AÑADIDO
       cache.set(cacheKey, googlePlacesFormat);
       return googlePlacesFormat;
     } catch (error) {
-      console.error('Error searching addresses:', error);
+      console.error('API_CLIENT: Error en searchAddresses:', error); // LOG MODIFICADO
       throw error;
     }
   }
 
-  // Get detailed address information
   static async getAddressDetails(placeId: string): Promise<GooglePlacesResult> {
+    console.log("API_CLIENT: getAddressDetails llamado con placeId:", placeId); // LOG AÑADIDO
     const cacheKey = `address_${placeId}`;
     if (cache.has(cacheKey)) {
+      console.log("API_CLIENT: Devolviendo desde caché para getAddressDetails:", placeId); // LOG AÑADIDO
       return cache.get(cacheKey);
     }
 
     try {
       await rateLimit();
       
-      // Using Nominatim for demo - replace with Google Places Details API
-      const response = await fetch(
-        `${API_CONFIG.NOMINATIM_URL}/lookup?osm_ids=N${placeId}&format=json&addressdetails=1`
-      );
+      const url = `${API_CONFIG.NOMINATIM_URL}/lookup?osm_ids=N${placeId}&format=json&addressdetails=1`;
+      console.log("API_CLIENT: URL de Nominatim construida (getAddressDetails):", url); // LOG AÑADIDO
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
+        console.error("API_CLIENT: Error en respuesta de Nominatim (getAddressDetails):", response.status, response.statusText); // LOG AÑADIDO
         throw new Error(`API Error: ${response.status}`);
       }
       
       const results = await response.json();
+      console.log("API_CLIENT: Respuesta cruda de Nominatim (getAddressDetails):", results); // LOG AÑADIDO
       const result = results[0];
       
       if (!result) {
+        console.error('API_CLIENT: Dirección no encontrada para placeId:', placeId); // LOG AÑADIDO
         throw new Error('Address not found');
       }
 
@@ -110,101 +115,93 @@ export class ApiClient {
           { long_name: result.address?.country || 'España', short_name: 'ES', types: ['country'] }
         ]
       };
-
+      console.log("API_CLIENT: Datos formateados (getAddressDetails):", googlePlacesResult); // LOG AÑADIDO
       cache.set(cacheKey, googlePlacesResult);
       return googlePlacesResult;
     } catch (error) {
-      console.error('Error getting address details:', error);
+      console.error('API_CLIENT: Error en getAddressDetails:', error); // LOG MODIFICADO
       throw error;
     }
   }
 
-  // PVGIS API through serverless proxy - NOW WORKS WITH REAL COORDINATES
   static async getSolarData(lat: number, lng: number, peakPower: number = 1, angle: number = 35, aspect: number = 0): Promise<PVGISResponse> {
     const cacheKey = `pvgis_${lat.toFixed(4)}_${lng.toFixed(4)}_${peakPower}_${angle}_${aspect}`;
     if (cache.has(cacheKey)) {
-      console.log('Using cached PVGIS data for:', lat, lng);
+      console.log('API_CLIENT: Usando PVGIS data cacheada para:', lat, lng);
       return cache.get(cacheKey);
     }
 
     try {
       await rateLimit();
-      
-      console.log('Fetching REAL PVGIS data via proxy for coordinates:', lat, lng, 'with angle:', angle);
-      
+      console.log('API_CLIENT: Obteniendo datos REALES de PVGIS via proxy para coordenadas:', lat, lng, 'con ángulo:', angle);
       const proxyUrl = `${API_CONFIG.PVGIS_PROXY_URL}?lat=${lat}&lng=${lng}&peakpower=${peakPower}&angle=${angle}&aspect=${aspect}`;
-      
-      console.log('PVGIS Proxy URL:', proxyUrl);
+      console.log('API_CLIENT: PVGIS Proxy URL:', proxyUrl);
       
       const response = await fetch(proxyUrl);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.warn(`PVGIS Proxy Error: ${response.status}, using fallback data`);
+        console.warn(`API_CLIENT: PVGIS Proxy Error: ${response.status}, usando fallback data. ErrorData:`, errorData);
         
-        if (errorData.fallback) {
+        // Asumiendo que tu proxy puede devolver una propiedad 'fallback'
+        if (errorData.fallback || response.status === 404 || response.status === 500) { 
           return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
         }
-        
         throw new Error(`Proxy error: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('API_CLIENT: Datos REALES de PVGIS recibidos via proxy:', data);
       
-      console.log('Real PVGIS data received via proxy:', data);
-      
-      // Validate PVGIS response structure
       if (!data.outputs || !data.outputs.totals || !data.outputs.totals.fixed) {
-        console.warn('Invalid PVGIS response structure from proxy, using enhanced fallback');
+        console.warn('API_CLIENT: Estructura de respuesta PVGIS inválida desde proxy, usando enhanced fallback');
         return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
       }
       
       cache.set(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Error fetching PVGIS data via proxy:', error);
-      console.log('Using enhanced fallback data for Spain');
+      console.error('API_CLIENT: Error obteniendo datos PVGIS via proxy:', error);
+      console.log('API_CLIENT: Usando enhanced fallback data para España');
       return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
     }
   }
 
-  // Enhanced method to test multiple angles and find optimal inclination
   static async getOptimalSolarData(lat: number, lng: number, peakPower: number = 1): Promise<{
     optimal: PVGISResponse;
     angle: number;
     allAngles: Array<{ angle: number; energyYield: number; data: PVGISResponse }>;
   }> {
-    const angles = [20, 25, 30, 35, 40, 45]; // Test multiple angles
+    const angles = [20, 25, 30, 35, 40, 45];
     const results = [];
-    
-    console.log('Testing multiple angles for optimal solar data via proxy...');
+    console.log('API_CLIENT: Probando múltiples ángulos para datos solares óptimos via proxy...');
     
     for (const angle of angles) {
       try {
-        const data = await this.getSolarData(lat, lng, peakPower, angle);
-        const energyYield = data.outputs.totals.fixed.E_y;
-        results.push({ angle, energyYield, data });
-        
-        console.log(`Angle ${angle}°: ${energyYield.toFixed(0)} kWh/kWp/year`);
-        
-        // Add delay to respect API limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const data = await this.getSolarData(lat, lng, peakPower, angle); // Reusa getSolarData
+        if (data && data.outputs && data.outputs.totals && data.outputs.totals.fixed && typeof data.outputs.totals.fixed.E_y === 'number') {
+          const energyYield = data.outputs.totals.fixed.E_y;
+          results.push({ angle, energyYield, data });
+          console.log(`API_CLIENT: Ángulo ${angle}°: ${energyYield.toFixed(0)} kWh/kWp/año`);
+        } else {
+          console.warn(`API_CLIENT: Datos inválidos o faltantes para el ángulo ${angle}°`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 500)); // Mantener el delay
       } catch (error) {
-        console.error(`Error testing angle ${angle}:`, error);
+        console.error(`API_CLIENT: Error probando ángulo ${angle}:`, error);
       }
     }
     
     if (results.length === 0) {
-      const fallbackData = await this.getSolarData(lat, lng, peakPower, 35);
+      console.warn("API_CLIENT: No se obtuvieron resultados para ningún ángulo, usando fallback para ángulo 35°");
+      const fallbackData = await this.getSolarData(lat, lng, peakPower, 35); // Usará fallback si falla
       return { optimal: fallbackData, angle: 35, allAngles: [] };
     }
     
-    // Find optimal angle
     const optimal = results.reduce((best, current) => 
       current.energyYield > best.energyYield ? current : best
     );
-    
-    console.log(`Optimal angle: ${optimal.angle}° with ${optimal.energyYield.toFixed(0)} kWh/kWp/year`);
+    console.log(`API_CLIENT: Ángulo óptimo: ${optimal.angle}° con ${optimal.energyYield.toFixed(0)} kWh/kWp/año`);
     
     return {
       optimal: optimal.data,
@@ -213,101 +210,74 @@ export class ApiClient {
     };
   }
 
-  // Enhanced fallback with realistic Spanish solar data
   static getEnhancedFallbackPVGISData(lat: number, lng: number, peakPower: number = 1, angle: number = 35): PVGISResponse {
-    console.warn('Using enhanced fallback PVGIS data with Spanish solar irradiance averages');
+    console.warn('API_CLIENT: Usando enhanced fallback PVGIS data con promedios solares españoles para:', {lat, lng, peakPower, angle});
     
-    // Spanish solar irradiance by latitude (approximate HSP values)
     const getSpanishHSP = (latitude: number): number => {
-      if (latitude >= 43) return 1200; // Northern Spain (Galicia, Asturias, Cantabria)
-      if (latitude >= 41) return 1400; // Central-North Spain (Castilla y León, País Vasco)
-      if (latitude >= 39) return 1550; // Central Spain (Madrid, Castilla-La Mancha)
-      if (latitude >= 37) return 1650; // Southern Central Spain (Extremadura, norte Andalucía)
-      return 1750; // Southern Spain (Andalucía, Murcia, Valencia)
+      if (latitude >= 43) return 1200;
+      if (latitude >= 41) return 1400;
+      if (latitude >= 39) return 1550;
+      if (latitude >= 37) return 1650;
+      return 1750;
     };
     
     const baseHSP = getSpanishHSP(lat);
+    const angleOptimizationFactor = 1 - Math.abs(angle - 35) * 0.008;
+    const annualEnergyYield = baseHSP * angleOptimizationFactor * peakPower; // Multiplicar por peakPower
     
-    // Angle optimization factor (35° is typically optimal for Spain)
-    const angleOptimizationFactor = 1 - Math.abs(angle - 35) * 0.008; // ~0.8% loss per degree from optimal
-    
-    const annualEnergyYield = baseHSP * angleOptimizationFactor;
-    
-    // Generate realistic monthly distribution
-    const monthlyDistribution = [
-      0.65, 0.75, 0.90, 1.10, 1.25, 1.35, // Jan-Jun
-      1.40, 1.35, 1.15, 0.95, 0.70, 0.60  // Jul-Dec
-    ];
+    const monthlyDistribution = [0.65,0.75,0.90,1.10,1.25,1.35,1.40,1.35,1.15,0.95,0.70,0.60];
     
     const monthly = monthlyDistribution.map((factor, i) => ({
       month: i + 1,
-      E_d: (annualEnergyYield * factor) / (30.44 * 12), // Daily average for month
-      E_m: (annualEnergyYield * factor) / 12, // Monthly total
-      H_sun: 4.5 + factor * 2.5 // Realistic sun hours
+      E_d: (annualEnergyYield * factor) / (30.44 * 12),
+      E_m: (annualEnergyYield * factor) / 12,
+      H_sun: 4.5 + factor * 2.5
     }));
 
-    // Generate realistic hourly data
     const hourly = Array.from({ length: 8760 }, (_, i) => {
       const hour = i % 24;
       const dayOfYear = Math.floor(i / 24);
       const solarNoon = 12;
       const hourFromNoon = Math.abs(hour - solarNoon);
-      const seasonalFactor = 0.7 + 0.5 * Math.sin((dayOfYear / 365) * 2 * Math.PI);
+      // Factor estacional más pronunciado para latitudes medias y altas
+      const seasonalFactor = 0.6 + 0.6 * Math.cos(((dayOfYear - 172) / 365) * 2 * Math.PI); // Pico en verano, mínimo en invierno
       
       return {
-        time: new Date(2024, 0, 1, hour).toISOString(),
-        P: hourFromNoon <= 6 ? Math.max(0, (peakPower * 1000 * Math.cos((hourFromNoon / 6) * Math.PI / 2) * seasonalFactor)) : 0,
-        G_i: hourFromNoon <= 6 ? Math.max(0, (800 * Math.cos((hourFromNoon / 6) * Math.PI / 2) * seasonalFactor)) : 0,
-        T_2m: 15 + 12 * Math.sin((dayOfYear / 365) * 2 * Math.PI) + 8 * Math.sin((hour / 24) * 2 * Math.PI)
+        time: new Date(2024, 0, 1 + dayOfYear, hour).toISOString(), // Fecha correcta
+        P: hourFromNoon <= 7 ? Math.max(0, (peakPower * 1000 * Math.pow(Math.cos((hourFromNoon / 7) * Math.PI / 2), 1.5) * seasonalFactor)) : 0,
+        G_i: hourFromNoon <= 7 ? Math.max(0, (1000 * Math.pow(Math.cos((hourFromNoon / 7) * Math.PI / 2), 1.5) * seasonalFactor)) : 0, // Irradiación pico 1000 W/m^2
+        T_2m: 15 + 10 * Math.sin(((dayOfYear - 100) / 365) * 2 * Math.PI) + 5 * Math.sin((hour / 24) * 2 * Math.PI) // Variación de temperatura
       };
     });
 
     return {
       outputs: {
         monthly,
-        totals: {
-          fixed: {
-            E_y: annualEnergyYield,
-            PR: 0.84 // Realistic performance ratio for Spain
-          }
-        },
+        totals: { fixed: { E_y: annualEnergyYield, PR: 0.82 } }, // PR ligeramente ajustado
         hourly
       }
     };
   }
 
-  // Get Spanish consumption profiles by province
   static async getConsumptionProfile(provinceCode: string): Promise<ConsumptionProfileData> {
     const cacheKey = `consumption_${provinceCode}`;
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey);
-    }
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-    // Mock data based on Spanish averages - in production, integrate with INE API
     const spanishProvinces: Record<string, ConsumptionProfileData> = {
       'default': {
         provinceCode,
-        averageConsumption: {
-          residential: 3500, // kWh/year
-          withAC: 4200,
-          withHeating: 4800,
-          withEV: 5000
-        },
-        hourlyProfile: [
-          0.3, 0.25, 0.22, 0.2, 0.18, 0.2, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0,
-          1.1, 1.0, 0.9, 0.8, 0.9, 1.2, 1.5, 1.8, 1.6, 1.2, 0.8, 0.5
-        ],
-        monthlyProfile: [1.1, 1.0, 0.9, 0.8, 0.7, 0.8, 1.2, 1.3, 0.9, 0.8, 1.0, 1.2]
+        averageConsumption: { residential: 3500, withAC: 4200, withHeating: 4800, withEV: 5000 },
+        hourlyProfile: [0.3,0.25,0.22,0.2,0.18,0.2,0.3,0.5,0.7,0.8,0.9,1.0,1.1,1.0,0.9,0.8,0.9,1.2,1.5,1.8,1.6,1.2,0.8,0.5],
+        monthlyProfile: [1.1,1.0,0.9,0.8,0.7,0.8,1.2,1.3,0.9,0.8,1.0,1.2]
       }
     };
-
     const profile = spanishProvinces[provinceCode] || spanishProvinces['default'];
     cache.set(cacheKey, profile);
     return profile;
   }
 
-  // Clear cache (useful for development)
   static clearCache(): void {
+    console.log("API_CLIENT: Limpiando caché"); // LOG AÑADIDO
     cache.clear();
   }
 }
