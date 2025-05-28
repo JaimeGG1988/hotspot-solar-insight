@@ -1,4 +1,5 @@
 
+// src/components/common/MapSelector.tsx
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, AlertCircle, Search } from 'lucide-react';
 import { useLeafletMap } from '../../hooks/useLeafletMap';
@@ -8,7 +9,6 @@ interface MapSelectorProps {
   initialCoordinates?: [number, number];
   initialAddress?: string;
   className?: string;
-  showTokenInput?: boolean;
 }
 
 const MapSelector: React.FC<MapSelectorProps> = ({
@@ -22,36 +22,58 @@ const MapSelector: React.FC<MapSelectorProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
+  const handleLocationSelectedFromHook = (coordinates: [number, number], address: string) => {
+    console.log("MAP_SELECTOR: handleLocationSelectedFromHook (desde hook) llamado con:", { coordinates, address }); // LOG
+    setSelectedAddress(address);
+    onLocationSelect(coordinates, address); // Propaga al AddressAnalyzer
+  };
+
   const { 
     mapContainer, 
     isLoaded, 
     error: mapError, 
     flyToCoordinates,
-    searchAddress,
-    geocodeAddress
+    searchAddress: searchAddressFromHook, // Renombrar para evitar conflicto
   } = useLeafletMap({
     initialCoordinates,
-    onLocationSelect: (coordinates, address) => {
-      setSelectedAddress(address);
-      onLocationSelect(coordinates, address);
-    }
+    onLocationSelect: handleLocationSelectedFromHook // Conectar con la función de arriba
   });
+
+  // Sincronizar selectedAddress si initialAddress cambia
+  useEffect(() => {
+    if (initialAddress) {
+      setSelectedAddress(initialAddress);
+    }
+  }, [initialAddress]);
+  
+  // Sincronizar mapa si initialCoordinates cambia
+  useEffect(() => {
+    if (initialCoordinates && flyToCoordinates) {
+        console.log("MAP_SELECTOR: initialCoordinates cambió, llamando a flyToCoordinates:", initialCoordinates); // LOG
+        flyToCoordinates(initialCoordinates);
+    }
+  }, [initialCoordinates, flyToCoordinates]);
+
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
+    console.log("MAP_SELECTOR: handleSearch (botón) llamado con query:", searchQuery); // LOG
 
     setIsSearching(true);
     try {
-      const result = await searchAddress(searchQuery + ', España');
+      // Usar la función searchAddress del hook useLeafletMap
+      const result = await searchAddressFromHook(searchQuery + ', España');
       if (result) {
-        setSelectedAddress(result.display_name);
-        setSearchQuery('');
-        setSearchResults([]);
+        console.log("MAP_SELECTOR: Resultado de searchAddressFromHook:", result); // LOG
+        // setSelectedAddress y onLocationSelect ya son llamados por el hook a través de handleLocationSelectedFromHook
+        setSearchQuery(''); // Limpiar input
+        setSearchResults([]); // Limpiar resultados
       } else {
+        console.warn('MAP_SELECTOR: No se encontró la dirección (handleSearch).'); // LOG
         alert('No se encontró la dirección. Intenta con una búsqueda más específica.');
       }
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('MAP_SELECTOR: Error en handleSearch:', error); // LOG
       alert('Error en la búsqueda. Inténtalo de nuevo.');
     } finally {
       setIsSearching(false);
@@ -60,16 +82,18 @@ const MapSelector: React.FC<MapSelectorProps> = ({
 
   const handleSearchInput = async (query: string) => {
     setSearchQuery(query);
+    console.log("MAP_SELECTOR: handleSearchInput (autocomplete) llamado con query:", query); // LOG
     
-    if (query.length > 3) {
+    if (query.length > 2) { // Umbral para autocompletar
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', España')}&countrycodes=es&limit=5&addressdetails=1`
-        );
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', España')}&countrycodes=es&limit=5&addressdetails=1`;
+        console.log("MAP_SELECTOR: URL Nominatim (autocomplete):", url); // LOG
+        const response = await fetch(url);
         const data = await response.json();
+        console.log("MAP_SELECTOR: Respuesta Nominatim (autocomplete):", data); // LOG
         setSearchResults(data || []);
       } catch (error) {
-        console.error('Autocomplete error:', error);
+        console.error('MAP_SELECTOR: Error en autocomplete:', error); // LOG
         setSearchResults([]);
       }
     } else {
@@ -78,15 +102,25 @@ const MapSelector: React.FC<MapSelectorProps> = ({
   };
 
   const selectSearchResult = (result: any) => {
+    console.log("MAP_SELECTOR: selectSearchResult llamado con:", result); // LOG
+    // Nominatim devuelve [lon, lat] en sus geometrías, pero .lat y .lon directamente
     const coordinates: [number, number] = [parseFloat(result.lon), parseFloat(result.lat)];
-    flyToCoordinates(coordinates);
-    setSelectedAddress(result.display_name);
-    setSearchQuery('');
-    setSearchResults([]);
-    onLocationSelect(coordinates, result.display_name);
+    
+    if (flyToCoordinates) {
+      flyToCoordinates(coordinates); // Centra el mapa y actualiza el marcador
+    }
+    // La llamada a onLocationSelect (y setSelectedAddress) ahora se maneja a través del
+    // onLocationSelect del hook que se llama cuando el marcador se actualiza o el mapa se hace clic,
+    // o desde searchAddressFromHook.
+    // Si necesitamos forzar la actualización aquí también:
+    // handleLocationSelectedFromHook(coordinates, result.display_name);
+    
+    setSearchQuery(''); // Limpiar input
+    setSearchResults([]); // Limpiar lista de resultados
   };
 
   const getCurrentLocation = () => {
+    console.log("MAP_SELECTOR: getCurrentLocation llamado."); // LOG
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -94,10 +128,14 @@ const MapSelector: React.FC<MapSelectorProps> = ({
             position.coords.longitude,
             position.coords.latitude
           ];
-          flyToCoordinates(coordinates);
+          console.log("MAP_SELECTOR: Ubicación actual obtenida:", coordinates); // LOG
+          if (flyToCoordinates) {
+            flyToCoordinates(coordinates);
+            // La reverse geocodificación y onLocationSelect se manejan dentro del hook
+          }
         },
-        (error) => {
-          console.error('Error getting location:', error);
+        (geoError) => {
+          console.error('MAP_SELECTOR: Error obteniendo ubicación:', geoError); // LOG
           alert('No se pudo obtener tu ubicación. Verifica los permisos del navegador.');
         }
       );
@@ -108,12 +146,10 @@ const MapSelector: React.FC<MapSelectorProps> = ({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Buscador de direcciones */}
       <div className="space-y-4">
         <label className="block text-lg font-semibold text-white">
           Buscar dirección
         </label>
-        
         <div className="relative">
           <div className="flex space-x-2">
             <div className="relative flex-1">
@@ -123,7 +159,7 @@ const MapSelector: React.FC<MapSelectorProps> = ({
                 onChange={(e) => handleSearchInput(e.target.value)}
                 placeholder="Escribe una dirección en España..."
                 className="input-premium w-full pr-10"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyPress={(e) => e.key === 'Enter' && !isSearching && handleSearch()}
               />
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gris-hotspot-medio" />
             </div>
@@ -135,17 +171,15 @@ const MapSelector: React.FC<MapSelectorProps> = ({
               {isSearching ? 'Buscando...' : 'Buscar'}
             </button>
           </div>
-
-          {/* Resultados de búsqueda */}
           {searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-gris-hotspot-profundo border border-white/20 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-              {searchResults.map((result, index) => (
+              {searchResults.map((item, index) => ( // Cambiado 'result' a 'item' para evitar conflicto
                 <button
-                  key={index}
-                  onClick={() => selectSearchResult(result)}
+                  key={item.place_id || index} // Usar place_id si está disponible
+                  onClick={() => selectSearchResult(item)}
                   className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/10 last:border-b-0 transition-colors"
                 >
-                  <p className="text-white text-sm">{result.display_name}</p>
+                  <p className="text-white text-sm">{item.display_name}</p>
                 </button>
               ))}
             </div>
@@ -153,7 +187,6 @@ const MapSelector: React.FC<MapSelectorProps> = ({
         </div>
       </div>
 
-      {/* Dirección seleccionada */}
       {selectedAddress && (
         <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
           <div className="flex items-center space-x-3">
@@ -166,7 +199,6 @@ const MapSelector: React.FC<MapSelectorProps> = ({
         </div>
       )}
 
-      {/* Controles adicionales */}
       <div className="flex space-x-2">
         <button
           onClick={getCurrentLocation}
@@ -177,7 +209,6 @@ const MapSelector: React.FC<MapSelectorProps> = ({
         </button>
       </div>
 
-      {/* Error del mapa */}
       {mapError && (
         <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 flex items-center space-x-3">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -185,7 +216,6 @@ const MapSelector: React.FC<MapSelectorProps> = ({
         </div>
       )}
 
-      {/* Contenedor del mapa */}
       <div className="space-y-2">
         <label className="block text-lg font-semibold text-white">
           Selecciona la ubicación en el mapa
@@ -207,8 +237,7 @@ const MapSelector: React.FC<MapSelectorProps> = ({
           Haz clic en el mapa, busca una dirección o arrastra el marcador para seleccionar la ubicación
         </p>
       </div>
-
-      {/* Información sobre el nuevo mapa */}
+      
       <div className="bg-green-500/30 border border-green-500/50 rounded-xl p-6">
         <h4 className="font-semibold text-white mb-3">🗺️ Nuevo Mapa Gratuito con React-Leaflet:</h4>
         <ul className="space-y-2 text-sm text-gris-hotspot-medio">
