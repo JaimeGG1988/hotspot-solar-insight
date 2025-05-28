@@ -3,7 +3,7 @@ import { GooglePlacesResponse, GooglePlacesResult, PVGISResponse, ClimateData, C
 // API configuration - in production, these would come from environment variables
 const API_CONFIG = {
   GOOGLE_PLACES_KEY: 'YOUR_GOOGLE_PLACES_API_KEY', // User should replace this
-  PVGIS_BASE_URL: 'https://re.jrc.ec.europa.eu/api/v5_2',
+  PVGIS_PROXY_URL: '/api/pvgis', // Our serverless proxy
   NOMINATIM_URL: 'https://nominatim.openstreetmap.org',
   RATE_LIMIT_DELAY: 1000 // 1 second between requests
 };
@@ -119,7 +119,7 @@ export class ApiClient {
     }
   }
 
-  // PVGIS API for real solar irradiance data - NOW USES REAL COORDINATES
+  // PVGIS API through serverless proxy - NOW WORKS WITH REAL COORDINATES
   static async getSolarData(lat: number, lng: number, peakPower: number = 1, angle: number = 35, aspect: number = 0): Promise<PVGISResponse> {
     const cacheKey = `pvgis_${lat.toFixed(4)}_${lng.toFixed(4)}_${peakPower}_${angle}_${aspect}`;
     if (cache.has(cacheKey)) {
@@ -130,35 +130,41 @@ export class ApiClient {
     try {
       await rateLimit();
       
-      console.log('Fetching REAL PVGIS data for coordinates:', lat, lng, 'with angle:', angle);
+      console.log('Fetching REAL PVGIS data via proxy for coordinates:', lat, lng, 'with angle:', angle);
       
-      const url = `${API_CONFIG.PVGIS_BASE_URL}/PVcalc?lat=${lat}&lon=${lng}&peakpower=${peakPower}&loss=14&angle=${angle}&aspect=${aspect}&mountingplace=building&outputformat=json`;
+      const proxyUrl = `${API_CONFIG.PVGIS_PROXY_URL}?lat=${lat}&lng=${lng}&peakpower=${peakPower}&angle=${angle}&aspect=${aspect}`;
       
-      console.log('PVGIS URL:', url);
+      console.log('PVGIS Proxy URL:', proxyUrl);
       
-      const response = await fetch(url);
+      const response = await fetch(proxyUrl);
       
       if (!response.ok) {
-        console.warn(`PVGIS API Error: ${response.status}, falling back to mock data`);
-        return ApiClient.getMockPVGISData();
+        const errorData = await response.json().catch(() => ({}));
+        console.warn(`PVGIS Proxy Error: ${response.status}, using fallback data`);
+        
+        if (errorData.fallback) {
+          return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
+        }
+        
+        throw new Error(`Proxy error: ${response.status}`);
       }
       
       const data = await response.json();
       
-      console.log('Real PVGIS data received:', data);
+      console.log('Real PVGIS data received via proxy:', data);
       
-      // Validate PVGIS response
+      // Validate PVGIS response structure
       if (!data.outputs || !data.outputs.totals || !data.outputs.totals.fixed) {
-        console.warn('Invalid PVGIS response structure, using mock data');
-        return ApiClient.getMockPVGISData();
+        console.warn('Invalid PVGIS response structure from proxy, using enhanced fallback');
+        return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
       }
       
       cache.set(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Error fetching PVGIS data:', error);
-      console.log('Falling back to mock data');
-      return ApiClient.getMockPVGISData();
+      console.error('Error fetching PVGIS data via proxy:', error);
+      console.log('Using enhanced fallback data for Spain');
+      return ApiClient.getEnhancedFallbackPVGISData(lat, lng, peakPower, angle);
     }
   }
 
@@ -171,7 +177,7 @@ export class ApiClient {
     const angles = [20, 25, 30, 35, 40, 45]; // Test multiple angles
     const results = [];
     
-    console.log('Testing multiple angles for optimal solar data...');
+    console.log('Testing multiple angles for optimal solar data via proxy...');
     
     for (const angle of angles) {
       try {
@@ -207,27 +213,52 @@ export class ApiClient {
     };
   }
 
-  // Fallback mock PVGIS data
-  static getMockPVGISData(): PVGISResponse {
-    const monthly = Array.from({ length: 12 }, (_, i) => ({
+  // Enhanced fallback with realistic Spanish solar data
+  static getEnhancedFallbackPVGISData(lat: number, lng: number, peakPower: number = 1, angle: number = 35): PVGISResponse {
+    console.warn('Using enhanced fallback PVGIS data with Spanish solar irradiance averages');
+    
+    // Spanish solar irradiance by latitude (approximate HSP values)
+    const getSpanishHSP = (latitude: number): number => {
+      if (latitude >= 43) return 1200; // Northern Spain (Galicia, Asturias, Cantabria)
+      if (latitude >= 41) return 1400; // Central-North Spain (Castilla y León, País Vasco)
+      if (latitude >= 39) return 1550; // Central Spain (Madrid, Castilla-La Mancha)
+      if (latitude >= 37) return 1650; // Southern Central Spain (Extremadura, norte Andalucía)
+      return 1750; // Southern Spain (Andalucía, Murcia, Valencia)
+    };
+    
+    const baseHSP = getSpanishHSP(lat);
+    
+    // Angle optimization factor (35° is typically optimal for Spain)
+    const angleOptimizationFactor = 1 - Math.abs(angle - 35) * 0.008; // ~0.8% loss per degree from optimal
+    
+    const annualEnergyYield = baseHSP * angleOptimizationFactor;
+    
+    // Generate realistic monthly distribution
+    const monthlyDistribution = [
+      0.65, 0.75, 0.90, 1.10, 1.25, 1.35, // Jan-Jun
+      1.40, 1.35, 1.15, 0.95, 0.70, 0.60  // Jul-Dec
+    ];
+    
+    const monthly = monthlyDistribution.map((factor, i) => ({
       month: i + 1,
-      E_d: 3.5 + Math.sin((i + 1) * Math.PI / 6) * 1.5, // Seasonal variation
-      E_m: (3.5 + Math.sin((i + 1) * Math.PI / 6) * 1.5) * 30,
-      H_sun: 5.2 + Math.sin((i + 1) * Math.PI / 6) * 2
+      E_d: (annualEnergyYield * factor) / (30.44 * 12), // Daily average for month
+      E_m: (annualEnergyYield * factor) / 12, // Monthly total
+      H_sun: 4.5 + factor * 2.5 // Realistic sun hours
     }));
 
+    // Generate realistic hourly data
     const hourly = Array.from({ length: 8760 }, (_, i) => {
       const hour = i % 24;
       const dayOfYear = Math.floor(i / 24);
       const solarNoon = 12;
       const hourFromNoon = Math.abs(hour - solarNoon);
-      const seasonalFactor = 0.8 + 0.4 * Math.sin((dayOfYear / 365) * 2 * Math.PI);
+      const seasonalFactor = 0.7 + 0.5 * Math.sin((dayOfYear / 365) * 2 * Math.PI);
       
       return {
         time: new Date(2024, 0, 1, hour).toISOString(),
-        P: hourFromNoon <= 6 ? Math.max(0, (1000 * Math.cos((hourFromNoon / 6) * Math.PI / 2) * seasonalFactor)) : 0,
+        P: hourFromNoon <= 6 ? Math.max(0, (peakPower * 1000 * Math.cos((hourFromNoon / 6) * Math.PI / 2) * seasonalFactor)) : 0,
         G_i: hourFromNoon <= 6 ? Math.max(0, (800 * Math.cos((hourFromNoon / 6) * Math.PI / 2) * seasonalFactor)) : 0,
-        T_2m: 20 + 10 * Math.sin((dayOfYear / 365) * 2 * Math.PI) + 5 * Math.sin((hour / 24) * 2 * Math.PI)
+        T_2m: 15 + 12 * Math.sin((dayOfYear / 365) * 2 * Math.PI) + 8 * Math.sin((hour / 24) * 2 * Math.PI)
       };
     });
 
@@ -236,8 +267,8 @@ export class ApiClient {
         monthly,
         totals: {
           fixed: {
-            E_y: monthly.reduce((sum, month) => sum + month.E_m, 0),
-            PR: 0.86
+            E_y: annualEnergyYield,
+            PR: 0.84 // Realistic performance ratio for Spain
           }
         },
         hourly
