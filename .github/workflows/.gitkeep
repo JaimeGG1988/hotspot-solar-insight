@@ -1,0 +1,5 @@
+# Este archivo .gitkeep asegura que el directorio .github/workflows/
+# se añada al control de versiones incluso si inicialmente está vacío,
+# o si solo contiene otros directorios vacíos.
+# GitHub Actions buscará archivos YAML aquí.
+# Puedes borrar este archivo una vez que añadas tu primer workflow .yml.
