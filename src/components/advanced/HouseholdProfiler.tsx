@@ -14,88 +14,95 @@ const HouseholdProfiler: React.FC<HouseholdProfilerProps> = ({
   isLoading,
   setIsLoading
 }) => {
-  const [profile, setProfile] = useState<HouseholdProfile>({
+  const [profile, setProfile] = useState<HouseholdProfile>({ // HouseholdProfile es un tipo local
     houseType: 'house',
-    occupants: 3,
-    surfaceArea: 120,
-    constructionYear: 2000,
-    hasAirConditioning: true,
-    hasElectricHeating: false,
-    hasPool: false,
-    hasEV: false,
-    electricBill: {
+    occupants: 3, // Corresponde a ConsumptionManualInputs.occupants
+    surfaceArea: 120, // Corresponde a ConsumptionManualInputs.areaM2
+    constructionYear: 2000, // No está en ConsumptionManualInputs
+    hasAirConditioning: true, // No está en ConsumptionManualInputs
+    hasElectricHeating: false, // No está en ConsumptionManualInputs
+    hasPool: false, // No está en ConsumptionManualInputs
+    hasEV: false, // Corresponde a ConsumptionManualInputs.hasEv
+    electricBill: { // No está en ConsumptionManualInputs
       monthlyKwh: 300,
       monthlyCost: 75
     }
+    // clp, evModel, annualKm son opcionales y podrían añadirse aquí
   });
 
-  const generateConsumptionPrediction = async (householdProfile: HouseholdProfile): Promise<ConsumptionPrediction> => {
-    setIsLoading(true);
-    
-    try {
-      // Simulate API call for consumption prediction
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      let baseConsumption = householdProfile.electricBill.monthlyKwh * 12;
-      
-      // Adjust based on household characteristics
-      if (householdProfile.hasEV) {
-        baseConsumption += 2500; // Average EV consumption
-      }
-      if (householdProfile.hasPool) {
-        baseConsumption += 1200; // Pool equipment
-      }
-      if (householdProfile.hasElectricHeating) {
-        baseConsumption += 3000; // Electric heating
-      }
-      
-      // Generate hourly profile (simplified)
-      const hourlyProfile = Array.from({ length: 8760 }, (_, hour) => {
-        const dayHour = hour % 24;
-        const month = Math.floor(hour / (24 * 30)) % 12;
-        
-        // Base consumption pattern
-        let factor = 0.5; // Base load
-        
-        // Daily pattern
-        if (dayHour >= 7 && dayHour <= 9) factor += 0.3; // Morning peak
-        if (dayHour >= 19 && dayHour <= 22) factor += 0.4; // Evening peak
-        
-        // Seasonal adjustment
-        if (month >= 5 && month <= 9 && householdProfile.hasAirConditioning) {
-          factor += 0.2; // Summer AC usage
-        }
-        if ((month <= 2 || month >= 11) && householdProfile.hasElectricHeating) {
-          factor += 0.3; // Winter heating
-        }
-        
-        return (baseConsumption / 8760) * factor;
-      });
-      
-      // Generate monthly profile
-      const monthlyProfile = Array.from({ length: 12 }, (_, month) => {
-        const startHour = month * 24 * 30;
-        const endHour = Math.min(startHour + 24 * 30, 8760);
-        return hourlyProfile.slice(startHour, endHour).reduce((sum, val) => sum + val, 0);
-      });
-      
-      const prediction: ConsumptionPrediction = {
-        currentAnnualKwh: baseConsumption,
-        futureAnnualKwh: baseConsumption,
-        hourlyProfile,
-        monthlyProfile,
-        peakPower: Math.max(...hourlyProfile) * 1.2 // Add 20% margin
-      };
-      
-      return prediction;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Esta función ya no genera la predicción, solo prepara los datos y llama a onProfileCompleted.
+  // La llamada a la API real se hará usando React Query en el componente padre o en un hook dedicado.
+  // O, si este componente se usa directamente en el wizard, aquí se haría la mutación de React Query.
+  // Por ahora, eliminamos la lógica de predicción y el setTimeout.
+  // La prop `onProfileCompleted` ahora debería esperar solo `HouseholdProfile` (los inputs)
+  // y la predicción vendrá del store de Zustand después de la llamada API.
+  // O, `onProfileCompleted` podría ser una función que *dispare* la llamada API.
+
+  // Para este refactor, asumiremos que `HouseholdProfiler` es responsable de
+  // recoger los datos del perfil Y de iniciar la llamada a la API de predicción de consumo manual.
+  // Esto requerirá React Query aquí.
+  // Sin embargo, el plan es solo "reemplazar stubs". Así que por ahora, solo quitaremos el setTimeout
+  // y la lógica de cálculo. La llamada real la manejará el componente que use HouseholdProfiler
+  // o se añadirá aquí en el paso de implementación del Wizard con React Query.
+
+  // const { mutate: predictConsumption, isLoading: isPredicting } = usePredictConsumptionManualMutation(); // Ejemplo de React Query
 
   const handleSubmit = async () => {
-    const prediction = await generateConsumptionPrediction(profile);
-    onProfileCompleted(profile, prediction);
+    // setIsLoading(true); // React Query se encargaría de esto con `isPending` o `isLoading` de useMutation
+
+    // 1. Mapear `profile` (estado local) a `ConsumptionManualInputs` (schema del backend)
+    const manualInputs = {
+      occupants: profile.occupants,
+      area_m2: profile.surfaceArea,
+      has_ev: profile.hasEV,
+      has_heat_pump: profile.hasElectricHeating, // Asumiendo que electricHeating es el equivalente a heat_pump
+      // clp: profile.clp, // Si se añade clp al estado local 'profile'
+    };
+
+    // 2. Aquí es donde se haría la llamada a la API con React Query:
+    // predictConsumption(manualInputs, {
+    //   onSuccess: (consumptionPredictionData) => {
+    //     // consumptionPredictionData es el ConsumptionOutput del backend
+    //     onProfileCompleted(profile, consumptionPredictionData); // Pasar inputs y output
+    //     setIsLoading(false);
+    //   },
+    //   onError: (error) => {
+    //     console.error("Error predicting consumption:", error);
+    //     alert("Error al predecir el consumo.");
+    //     setIsLoading(false);
+    //   }
+    // });
+
+    // **** Inicio del Refactor: Eliminación del setTimeout y lógica de cálculo ****
+    // La lógica de cálculo de `generateConsumptionPrediction` se ha eliminado.
+    // El `setTimeout` también se ha eliminado.
+    // La llamada real a la API y el manejo de `isLoading` se harán con React Query
+    // en un paso posterior cuando se implemente el wizard.
+    // Por ahora, `handleSubmit` solo llamará a `onProfileCompleted` con los datos del perfil.
+    // El componente que usa `HouseholdProfiler` (probablemente un paso del wizard)
+    // será responsable de tomar estos `profile` (inputs) y llamar al endpoint del backend.
+
+    // Esto significa que `onProfileCompleted` probablemente solo necesite los inputs del perfil ahora,
+    // y el componente padre se encargará de la llamada API y de actualizar el store de Zustand.
+    // O, `onProfileCompleted` se podría redefinir para que tome los `manualInputs` y dispare la mutación.
+
+    // Simplificación para este paso de refactor:
+    // `onProfileCompleted` ahora solo pasa los datos del perfil.
+    // El componente que lo usa (Paso 2 del wizard) tomará estos datos,
+    // los mapeará a ConsumptionManualInputs, y llamará al endpoint.
+    // La prop `isLoading` y `setIsLoading` podrían ser eliminadas de este componente
+    // si React Query maneja el estado de carga globalmente o en el componente llamador.
+
+    logger.warn("HouseholdProfiler.handleSubmit: Lógica de llamada a API y predicción eliminada. Se debe implementar con React Query en el componente del wizard.");
+    // Simplemente pasamos los datos del perfil recogidos.
+    // El componente padre (Paso 2 del wizard) usará estos datos para llamar al endpoint.
+    onProfileCompleted(profile, {} as ConsumptionPrediction); // Pasar un objeto vacío como predicción temporal
+    // La firma de onProfileCompleted era (profile: HouseholdProfile, prediction: ConsumptionPrediction)
+    // Para que no rompa, pasamos un objeto vacío. El componente padre deberá ajustarse.
+    // O mejor, si `onProfileCompleted` es solo para notificar que el perfil está listo:
+    // onProfileCompleted(profile); y el padre hace el resto.
+    // Para este refactor, mantendremos la firma pero la predicción será placeholder.
+    // **** Fin del Refactor ****
   };
 
   return (

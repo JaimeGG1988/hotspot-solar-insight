@@ -79,55 +79,48 @@ const PasoEconomico: React.FC<PasoEconomicoProps> = ({
         setIsLoading(true);
 
         // Preparar datos para enviar al backend
-        const payload = {
-          datosEntradaPrincipal: {
-            tipoCliente: 'residencial',
-            tipoEntradaConsumo: data.consumo.tipoEntrada,
-            consumoAnual: data.consumo.consumoAnual,
-            consumosMensuales: data.consumo.consumosMensuales,
-            tipoPerfilUsuario: data.consumo.perfilUsuario,
-            tieneVE: data.consumo.tieneVE,
-            tieneBombaCalor: data.consumo.tieneBombaCalor,
-            nombreArchivoCSV: data.consumo.nombreArchivoCSV,
-            ubicacion: data.instalacion.ubicacion,
-            latitud: data.instalacion.latitud,
-            longitud: data.instalacion.longitud,
-            orientacion: data.instalacion.orientacion,
-            inclinacion: data.instalacion.inclinacion
-          },
-          ajustesTecnicosSistemaFV: {
-            potenciaModuloDefinida: data.tecnico.potenciaModulo,
-            cantidadModulosDefinida: data.tecnico.cantidadModulos,
-            potenciaInversorFinal: data.tecnico.potenciaInversorFinal
-          },
-          parametrosEconomicos: {
-            precioElectricidad: data.economico.precioElectricidad,
-            costeModulos: data.economico.costeModulos,
-            costeInversor: data.economico.costeInversor,
-            costeEstructura: data.economico.costeEstructura,
-            costeAuxiliares: data.economico.costeAuxiliares,
-            costeManoObra: data.economico.costeManoObra
-          }
-        };
+        // Esta parte es importante y se mantendrá, pero los datos vendrán del store de Zustand
+        // en lugar de `props.data`.
+        // const {
+        //   locationAnalysisResults,
+        //   consumptionPredictionResults,
+        //   pvConfigurationInputs,
+        //   // ... otros datos del store necesarios para FinanceInput del backend
+        // } = useCalculatorStore.getState(); // O pasarlos como props si este componente no accede directamente al store
 
-        // Simular llamada al backend (reemplazar con llamada real)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Datos simulados de respuesta
-        const resultados = {
-          potenciaPicoInstalada_kWp: data.tecnico.potenciaPicoFinal,
-          potenciaInversor_kW: data.tecnico.potenciaInversorFinal,
-          produccionAnualEstimada_kWh: data.tecnico.potenciaPicoFinal * 1400, // Factor de producción simulado
-          porcentajeCoberturaFV: 65, // Simulado
-          ahorroEconomicoAnual_eur: data.tecnico.potenciaPicoFinal * 1400 * data.economico.precioElectricidad * 0.65,
-          costeTotalInstalacion_eur: calcularCosteTotal(),
-          periodoRetornoInversion_anios: calcularCosteTotal() / (data.tecnico.potenciaPicoFinal * 1400 * data.economico.precioElectricidad * 0.65)
-        };
+        // TODO: Mapear los datos del store de Zustand al formato `FinanceInput` del backend.
+        // Ejemplo (requiere que los datos estén en el store):
+        // const financeApiPayload = {
+        //   location_data: locationAnalysisResults,
+        //   consumption_data: consumptionPredictionResults,
+        //   system_cost_per_kwp: data.economico.costeTotal / (pvConfigurationInputs.panelWp * pvConfigurationInputs.panelCount / 1000), // Ejemplo
+        //   energy_price_kwh: data.economico.precioElectricidad,
+        //   feed_in_tariff_kwh: 0.05, // Ejemplo, necesita input en el UI
+        //   eligible_region_code: locationAnalysisResults?.region_code || "ES", // Ejemplo
+        //   inflation_rate_percent: 2.0, // Ejemplo, necesita input
+        //   discount_rate_percent: 5.0, // Ejemplo, necesita input
+        //   analysis_years: 25
+        // };
 
-        updateData({ resultados });
+        // **** Inicio del Refactor: Eliminación del setTimeout y lógica de simulación ****
+        // La llamada real a la API /api/finance/calculate y el manejo de `isLoading`
+        // se harán con React Query en un paso posterior.
+        // `updateData({ resultados })` será reemplazado por `setFinanceAnalysisResults(datosDeLaApi)` del store.
+
+        logger.warn("PasoEconomico.validateAndNext: Lógica de llamada a API y simulación de resultados eliminada. Se debe implementar con React Query y datos del store.");
+
+        // Por ahora, para que el flujo continúe, simplemente llamamos a onNext.
+        // En la implementación real con React Query, onNext se llamaría en el onSuccess de la mutación.
+        // Y los resultados se guardarían en el store de Zustand.
+        // setIsLoading(true) y setIsLoading(false) serían manejados por React Query.
+
+        // Simulación temporal para avanzar:
+        // setFinanceAnalysisResults({ dummyFinancialData: "Resultados financieros simulados" }); // Ejemplo
         onNext();
-      } catch (error) {
-        console.error('Error calculating results:', error);
+        // La lógica de `setIsLoading(false)` se movió al `finally` que ya existía.
+        // } catch (error) { // El bloque catch original
+      } catch (error) { // Mantener el bloque catch para otros errores de validación o preparación
+        console.error('Error preparing for financial calculation:', error);
         newErrors.push('Error al calcular los resultados');
         setErrors(newErrors);
       } finally {

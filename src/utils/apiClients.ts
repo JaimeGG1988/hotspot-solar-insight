@@ -186,7 +186,7 @@ export class ApiClient {
         } else {
           console.warn(`API_CLIENT: Datos inválidos o faltantes para el ángulo ${angle}°`);
         }
-        await new Promise(resolve => setTimeout(resolve, 500)); // Mantener el delay
+        // await new Promise(resolve => setTimeout(resolve, 500)); // Eliminado - rateLimit en getSolarData debería ser suficiente
       } catch (error) {
         console.error(`API_CLIENT: Error probando ángulo ${angle}:`, error);
       }
