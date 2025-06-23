@@ -1,3 +1,4 @@
+
 // src/hooks/useLeafletMap.ts
 import { useRef, useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
@@ -26,18 +27,19 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const marker = useRef<L.Marker | null>(null);
+  const isInitialized = useRef(false);
   
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const geocodeAddress = useCallback(async (address: string): Promise<{ lat: number; lng: number; display_name: string } | null> => {
-    console.log("HOOK_useLeafletMap: geocodeAddress llamado con:", address); // LOG
+    console.log("HOOK_useLeafletMap: geocodeAddress llamado con:", address);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=es&limit=1&addressdetails=1`;
-      console.log("HOOK_useLeafletMap: URL Nominatim (geocodeAddress):", url); // LOG
+      console.log("HOOK_useLeafletMap: URL Nominatim (geocodeAddress):", url);
       const response = await fetch(url);
       const data = await response.json();
-      console.log("HOOK_useLeafletMap: Respuesta Nominatim (geocodeAddress):", data); // LOG
+      console.log("HOOK_useLeafletMap: Respuesta Nominatim (geocodeAddress):", data);
       
       if (data && data.length > 0) {
         const result = {
@@ -45,13 +47,13 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
           lng: parseFloat(data[0].lon),
           display_name: data[0].display_name
         };
-        console.log("HOOK_useLeafletMap: Coordenadas extraídas (geocodeAddress):", result); // LOG
+        console.log("HOOK_useLeafletMap: Coordenadas extraídas (geocodeAddress):", result);
         return result;
       }
-      console.warn("HOOK_useLeafletMap: No se encontraron resultados en Nominatim para (geocodeAddress):", address); // LOG
+      console.warn("HOOK_useLeafletMap: No se encontraron resultados en Nominatim para (geocodeAddress):", address);
       return null;
     } catch (err) {
-      console.error('HOOK_useLeafletMap: Error en geocodeAddress:', err); // LOG
+      console.error('HOOK_useLeafletMap: Error en geocodeAddress:', err);
       setError('Error al buscar la dirección.');
       return null;
     }
@@ -59,31 +61,31 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
 
   const reverseGeocode = useCallback(async (coordinates: [number, number]) => {
     const [lng, lat] = coordinates;
-    console.log("HOOK_useLeafletMap: reverseGeocode llamado con coords:", { lat, lng }); // LOG
+    console.log("HOOK_useLeafletMap: reverseGeocode llamado con coords:", { lat, lng });
     try {
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&countrycodes=es`;
-      console.log("HOOK_useLeafletMap: URL Nominatim (reverseGeocode):", url); // LOG
+      console.log("HOOK_useLeafletMap: URL Nominatim (reverseGeocode):", url);
       const response = await fetch(url);
       const data = await response.json();
-      console.log("HOOK_useLeafletMap: Respuesta Nominatim (reverseGeocode):", data); // LOG
+      console.log("HOOK_useLeafletMap: Respuesta Nominatim (reverseGeocode):", data);
       
       if (data && data.display_name) {
-        console.log("HOOK_useLeafletMap: Dirección encontrada (reverseGeocode):", data.display_name); // LOG
+        console.log("HOOK_useLeafletMap: Dirección encontrada (reverseGeocode):", data.display_name);
         options.onLocationSelect?.(coordinates, data.display_name);
       } else {
-        console.warn("HOOK_useLeafletMap: No se encontró dirección para (reverseGeocode):", coordinates); // LOG
-        options.onLocationSelect?.(coordinates, `${lat.toFixed(5)}, ${lng.toFixed(5)}`); // Fallback a coordenadas
+        console.warn("HOOK_useLeafletMap: No se encontró dirección para (reverseGeocode):", coordinates);
+        options.onLocationSelect?.(coordinates, `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
       }
     } catch (err) {
-      console.error('HOOK_useLeafletMap: Error en reverseGeocode:', err); // LOG
-      options.onLocationSelect?.(coordinates, `${lat.toFixed(5)}, ${lng.toFixed(5)}`); // Fallback a coordenadas en caso de error
+      console.error('HOOK_useLeafletMap: Error en reverseGeocode:', err);
+      options.onLocationSelect?.(coordinates, `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     }
-  }, [options.onLocationSelect]);
+  }, [options]);
 
   const updateMarker = useCallback((coordinates: [number, number]) => {
     if (!map.current) return;
     const [lng, lat] = coordinates;
-    console.log("HOOK_useLeafletMap: updateMarker con coords:", { lat, lng }); // LOG
+    console.log("HOOK_useLeafletMap: updateMarker con coords:", { lat, lng });
 
     if (marker.current) {
       map.current.removeLayer(marker.current);
@@ -104,14 +106,16 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
     marker.current.on('dragend', (e: L.DragEndEvent) => {
       const latlng = e.target.getLatLng();
       const newCoordinates: [number, number] = [latlng.lng, latlng.lat];
-      console.log("HOOK_useLeafletMap: Marcador arrastrado a:", newCoordinates); // LOG
+      console.log("HOOK_useLeafletMap: Marcador arrastrado a:", newCoordinates);
       reverseGeocode(newCoordinates);
     });
   }, [reverseGeocode]);
   
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
-    console.log("HOOK_useLeafletMap: Inicializando mapa..."); // LOG
+    if (!mapContainer.current || isInitialized.current) return;
+    
+    console.log("HOOK_useLeafletMap: Inicializando mapa...");
+    isInitialized.current = true;
 
     try {
       const initialCenter = options.initialCoordinates 
@@ -134,54 +138,62 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
 
       if (options.initialCoordinates) {
         updateMarker(options.initialCoordinates);
-         // Si hay coords iniciales, también obtener la dirección
         reverseGeocode(options.initialCoordinates);
       }
 
       map.current.on('click', (e: L.LeafletMouseEvent) => {
         const coordinates: [number, number] = [e.latlng.lng, e.latlng.lat];
-        console.log("HOOK_useLeafletMap: Clic en mapa en coords:", coordinates); // LOG
+        console.log("HOOK_useLeafletMap: Clic en mapa en coords:", coordinates);
         updateMarker(coordinates);
         reverseGeocode(coordinates);
       });
 
       map.current.on('load', () => setIsLoaded(true));
       setTimeout(() => setIsLoaded(true), 500);
-      console.log("HOOK_useLeafletMap: Mapa inicializado."); // LOG
+      console.log("HOOK_useLeafletMap: Mapa inicializado.");
 
     } catch (err) {
-      console.error('HOOK_useLeafletMap: Error inicializando mapa:', err); // LOG
+      console.error('HOOK_useLeafletMap: Error inicializando mapa:', err);
       setError('Error al inicializar el mapa.');
     }
 
     return () => {
       if (map.current) {
-        console.log("HOOK_useLeafletMap: Eliminando mapa."); // LOG
+        console.log("HOOK_useLeafletMap: Eliminando mapa.");
         map.current.remove();
         map.current = null;
+        isInitialized.current = false;
       }
     };
-  }, [options.initialCoordinates, updateMarker, reverseGeocode]); // updateMarker y reverseGeocode en dependencias
+  }, []); // Solo inicializar una vez
+
+  // Effect separado para manejar cambios en las coordenadas iniciales
+  useEffect(() => {
+    if (options.initialCoordinates && map.current && isInitialized.current) {
+      console.log("HOOK_useLeafletMap: Actualizando coordenadas iniciales:", options.initialCoordinates);
+      updateMarker(options.initialCoordinates);
+      const [lng, lat] = options.initialCoordinates;
+      map.current.flyTo([lat, lng], 15, { duration: 2 });
+    }
+  }, [options.initialCoordinates, updateMarker]);
 
   const flyToCoordinates = useCallback((coordinates: [number, number]) => {
     if (!map.current) return;
-    console.log("HOOK_useLeafletMap: flyToCoordinates llamado con:", coordinates); // LOG
+    console.log("HOOK_useLeafletMap: flyToCoordinates llamado con:", coordinates);
     
-    const [lng, lat] = coordinates; // Lng es primero en tus coordenadas
-    updateMarker(coordinates); // updateMarker espera [lng, lat]
-    map.current.flyTo([lat, lng], 15, { duration: 2 }); // Leaflet espera [lat, lng]
+    const [lng, lat] = coordinates;
+    updateMarker(coordinates);
+    map.current.flyTo([lat, lng], 15, { duration: 2 });
   }, [updateMarker]);
 
   const searchAddress = useCallback(async (address: string) => {
-    console.log("HOOK_useLeafletMap: searchAddress (del hook) llamado con:", address); // LOG
-    const result = await geocodeAddress(address); // Usa la función interna del hook
+    console.log("HOOK_useLeafletMap: searchAddress (del hook) llamado con:", address);
+    const result = await geocodeAddress(address);
     if (result) {
-      const coordinates: [number, number] = [result.lng, result.lat]; // Lng, Lat
-      flyToCoordinates(coordinates); // flyToCoordinates espera [lng, lat]
-      // options.onLocationSelect se llama desde reverseGeocode o desde el clic si no hay búsqueda
-      // O si queremos que se llame aquí también para la búsqueda:
+      const coordinates: [number, number] = [result.lng, result.lat];
+      flyToCoordinates(coordinates);
       if(options.onLocationSelect) {
-        console.log("HOOK_useLeafletMap: Llamando a onLocationSelect desde searchAddress con:", coordinates, result.display_name); //LOG
+        console.log("HOOK_useLeafletMap: Llamando a onLocationSelect desde searchAddress con:", coordinates, result.display_name);
         options.onLocationSelect(coordinates, result.display_name);
       }
       return result;
@@ -195,6 +207,6 @@ export const useLeafletMap = (options: LeafletMapOptions = {}) => {
     isLoaded,
     error,
     flyToCoordinates,
-    searchAddress, // Esta es la que usa MapSelector
+    searchAddress,
   };
 };
