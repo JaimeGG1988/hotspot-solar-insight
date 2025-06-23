@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction } from '../../types/AdvancedTypes';
-import AddressAnalyzer from '../advanced/AddressAnalyzer';
-import HouseholdProfiler from '../advanced/HouseholdProfiler';
+import AddressAnalysisStep from './AddressAnalysisStep';
+import HouseholdAnalysisStep from './HouseholdAnalysisStep';
+import SubStepIndicator from '../common/SubStepIndicator';
 
 interface PasoAnalisisAvanzadoProps {
   onNext: () => void;
@@ -19,6 +20,8 @@ interface PasoAnalisisAvanzadoProps {
   }) => void;
 }
 
+type SubStep = 'address' | 'household';
+
 const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
   onNext,
   onPrev,
@@ -26,14 +29,19 @@ const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
   setIsLoading,
   onDataUpdate
 }) => {
-  const [currentSubStep, setCurrentSubStep] = useState<'address' | 'household'>('address');
+  const [currentSubStep, setCurrentSubStep] = useState<SubStep>('address');
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [addressData, setAddressData] = useState<{ 
     address: AddressDetails; 
     roofAnalysis: RoofAnalysis;
     pvgisData?: any;
     coordinates?: [number, number];
   } | null>(null);
-  const [householdData, setHouseholdData] = useState<{ profile: HouseholdProfile; prediction: ConsumptionPrediction } | null>(null);
+
+  const steps = [
+    { id: 'address', label: 'Análisis del Tejado', number: 1 },
+    { id: 'household', label: 'Perfil del Hogar', number: 2 }
+  ];
 
   const handleAddressAnalyzed = (address: AddressDetails, roofAnalysis: RoofAnalysis, additionalData?: any) => {
     const data = { 
@@ -43,12 +51,11 @@ const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
       coordinates: additionalData?.coordinates
     };
     setAddressData(data);
+    setCompletedSteps(['address']);
     setCurrentSubStep('household');
   };
 
   const handleHouseholdCompleted = (profile: HouseholdProfile, prediction: ConsumptionPrediction) => {
-    setHouseholdData({ profile, prediction });
-    
     if (addressData) {
       onDataUpdate({
         address: addressData.address,
@@ -65,50 +72,45 @@ const PasoAnalisisAvanzado: React.FC<PasoAnalisisAvanzadoProps> = ({
   const handleBack = () => {
     if (currentSubStep === 'household') {
       setCurrentSubStep('address');
+      setCompletedSteps([]);
     } else {
       onPrev();
     }
   };
 
+  const renderCurrentStep = () => {
+    switch (currentSubStep) {
+      case 'address':
+        return (
+          <AddressAnalysisStep
+            onAnalysisComplete={handleAddressAnalyzed}
+            isLoading={isLoading}
+            setIsLoading={setIsLoading}
+          />
+        );
+      case 'household':
+        return (
+          <HouseholdAnalysisStep
+            onProfileComplete={handleHouseholdCompleted}
+            isLoading={isLoading}
+            setIsLoading={setIsLoading}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Progress indicator for sub-steps */}
-      <div className="flex items-center justify-center space-x-4 mb-8">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-          currentSubStep === 'address' 
-            ? 'bg-cobre-hotspot-plano text-white' 
-            : addressData ? 'bg-green-500 text-white' : 'bg-white/20 text-gris-hotspot-medio'
-        }`}>
-          1
-        </div>
-        <div className={`h-1 w-16 ${addressData ? 'bg-green-500' : 'bg-white/20'}`}></div>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-          currentSubStep === 'household' 
-            ? 'bg-cobre-hotspot-plano text-white' 
-            : householdData ? 'bg-green-500 text-white' : 'bg-white/20 text-gris-hotspot-medio'
-        }`}>
-          2
-        </div>
-      </div>
+      <SubStepIndicator 
+        currentStep={currentSubStep}
+        completedSteps={completedSteps}
+        steps={steps}
+      />
 
-      {/* Sub-step content */}
-      {currentSubStep === 'address' && (
-        <AddressAnalyzer
-          onAddressAnalyzed={handleAddressAnalyzed}
-          isLoading={isLoading}
-          setIsLoading={setIsLoading}
-        />
-      )}
+      {renderCurrentStep()}
 
-      {currentSubStep === 'household' && (
-        <HouseholdProfiler
-          onProfileCompleted={handleHouseholdCompleted}
-          isLoading={isLoading}
-          setIsLoading={setIsLoading}
-        />
-      )}
-
-      {/* Navigation */}
       <div className="flex justify-between">
         <button
           onClick={handleBack}

@@ -8,9 +8,9 @@ import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
 import { useCalculatorData } from '../hooks/useCalculatorData';
 import { useSolarResults } from '../hooks/useSolarCalculations';
+import { useWizardNavigation } from '../hooks/useWizardNavigation';
 
 const CalculadoraSolar = () => {
-  const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
   const {
@@ -20,6 +20,18 @@ const CalculadoraSolar = () => {
     updateAdvancedData,
     resetCalculator
   } = useCalculatorData();
+
+  const {
+    currentStep,
+    nextStep,
+    prevStep,
+    markStepCompleted
+  } = useWizardNavigation({ 
+    totalSteps: 4,
+    onStepChange: (step) => {
+      console.log(`Navegando al paso: ${step}`);
+    }
+  });
 
   const {
     data: calculatedResults,
@@ -32,16 +44,38 @@ const CalculadoraSolar = () => {
     advancedData.pvgisData
   );
 
-  const nextStep = () => {
-    if (currentStep < 4) {
-      setCurrentStep(prev => prev + 1);
-    }
+  const handleAdvancedDataUpdate = (newData: any) => {
+    updateAdvancedData({
+      address: newData.address,
+      roofAnalysis: newData.roofAnalysis,
+      householdProfile: newData.householdProfile,
+      consumptionPrediction: newData.consumptionPrediction,
+      pvgisData: newData.pvgisData,
+      coordinates: newData.coordinates
+    });
+    markStepCompleted(1);
   };
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
+  const handleTechnicalStepNext = () => {
+    // Update technical data based on REAL roof analysis
+    if (advancedData.roofAnalysis) {
+      const recommendedKwp = Math.min(advancedData.roofAnalysis.maxKwp * 0.85, 10);
+      const recommendedInverter = recommendedKwp * 0.9;
+      const moduleCount = Math.floor((recommendedKwp * 1000) / 450);
+      
+      updateData({
+        tecnico: {
+          ...data.tecnico,
+          potenciaPicoRecomendada: recommendedKwp,
+          potenciaInversorRecomendada: recommendedInverter,
+          cantidadModulos: moduleCount,
+          potenciaPicoFinal: recommendedKwp,
+          potenciaInversorFinal: recommendedInverter
+        }
+      });
     }
+    markStepCompleted(2);
+    nextStep();
   };
 
   const calculateAdvancedResults = async () => {
@@ -52,10 +86,10 @@ const CalculadoraSolar = () => {
     }
 
     // The calculation is handled by the useSolarResults hook
-    // We just need to wait for it to complete and then proceed
     if (calculatedResults) {
       updateAdvancedData({ advancedResults: calculatedResults });
-      setCurrentStep(4);
+      markStepCompleted(3);
+      nextStep();
     } else if (calculationError) {
       console.error('Error calculating results:', calculationError);
       alert('Error al calcular los resultados. Por favor, verifica que todos los datos estén disponibles.');
@@ -71,16 +105,7 @@ const CalculadoraSolar = () => {
             onPrev={prevStep}
             isLoading={isLoading}
             setIsLoading={setIsLoading}
-            onDataUpdate={(newData) => {
-              updateAdvancedData({
-                address: newData.address,
-                roofAnalysis: newData.roofAnalysis,
-                householdProfile: newData.householdProfile,
-                consumptionPrediction: newData.consumptionPrediction,
-                pvgisData: (newData as any).pvgisData,
-                coordinates: (newData as any).coordinates
-              });
-            }}
+            onDataUpdate={handleAdvancedDataUpdate}
           />
         );
       case 2:
@@ -88,26 +113,7 @@ const CalculadoraSolar = () => {
           <PasoTecnico
             data={data}
             updateData={updateData}
-            onNext={() => {
-              // Update technical data based on REAL roof analysis
-              if (advancedData.roofAnalysis) {
-                const recommendedKwp = Math.min(advancedData.roofAnalysis.maxKwp * 0.85, 10);
-                const recommendedInverter = recommendedKwp * 0.9;
-                const moduleCount = Math.floor((recommendedKwp * 1000) / 450);
-                
-                updateData({
-                  tecnico: {
-                    ...data.tecnico,
-                    potenciaPicoRecomendada: recommendedKwp,
-                    potenciaInversorRecomendada: recommendedInverter,
-                    cantidadModulos: moduleCount,
-                    potenciaPicoFinal: recommendedKwp,
-                    potenciaInversorFinal: recommendedInverter
-                  }
-                });
-              }
-              nextStep();
-            }}
+            onNext={handleTechnicalStepNext}
             onPrev={prevStep}
             isLoading={isLoading}
           />
@@ -145,20 +151,21 @@ const CalculadoraSolar = () => {
     }
   };
 
-  // If there's a calculation error, go back to step 3
+  // Handle calculation errors
   React.useEffect(() => {
     if (calculationError && currentStep === 4) {
-      setTimeout(() => setCurrentStep(3), 2000);
+      setTimeout(() => prevStep(), 2000);
     }
-  }, [calculationError, currentStep]);
+  }, [calculationError, currentStep, prevStep]);
 
-  // When calculation results are ready, move to step 4
+  // Move to results when calculation is ready
   React.useEffect(() => {
     if (calculatedResults && currentStep === 3) {
       updateAdvancedData({ advancedResults: calculatedResults });
-      setCurrentStep(4);
+      markStepCompleted(3);
+      nextStep();
     }
-  }, [calculatedResults, currentStep, updateAdvancedData]);
+  }, [calculatedResults, currentStep, updateAdvancedData, markStepCompleted, nextStep]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-azul-hotspot via-azul-hotspot to-gris-hotspot-profundo">
