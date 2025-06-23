@@ -6,3 +6,8 @@ numpy
 pandas
 python-dotenv
 python-multipart
+
+# Testing dependencies
+pytest
+pytest-cov
+httpx
