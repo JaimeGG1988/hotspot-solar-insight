@@ -1,29 +1,30 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import Header from './Header';
 import StepIndicator from './StepIndicator';
-import PasoAnalisisAvanzado from './steps/PasoAnalisisAvanzado';
+import OptimizedPasoAnalisisAvanzado from './steps/OptimizedPasoAnalisisAvanzado';
 import PasoTecnico from './steps/PasoTecnico';
 import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
 import ErrorBoundary from './common/ErrorBoundary';
-import LoadingSpinner from './common/LoadingSpinner';
-import { useCalculatorData } from '../hooks/useCalculatorData';
+import OptimizedLoadingSpinner from './common/OptimizedLoadingSpinner';
+import { useOptimizedCalculatorData } from '../hooks/useOptimizedCalculatorData';
 import { useSolarResults } from '../hooks/useSolarCalculations';
 import { useWizardNavigation } from '../hooks/useWizardNavigation';
-import { useErrorHandler } from '../hooks/useErrorHandler';
+import { useOptimizedErrorHandler } from '../hooks/useOptimizedErrorHandler';
 
 const CalculadoraSolar = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const { handleError, withErrorHandling } = useErrorHandler();
+  const { handleError, withErrorHandling } = useOptimizedErrorHandler();
   
   const {
     data,
     advancedData,
     updateData,
     updateAdvancedData,
-    resetCalculator
-  } = useCalculatorData();
+    resetCalculator,
+    calculationStatus
+  } = useOptimizedCalculatorData();
 
   const {
     currentStep,
@@ -32,9 +33,9 @@ const CalculadoraSolar = () => {
     markStepCompleted
   } = useWizardNavigation({ 
     totalSteps: 4,
-    onStepChange: (step) => {
+    onStepChange: useCallback((step) => {
       console.log(`Navegando al paso: ${step}`);
-    }
+    }, [])
   });
 
   const {
@@ -48,7 +49,7 @@ const CalculadoraSolar = () => {
     advancedData.pvgisData
   );
 
-  const handleAdvancedDataUpdate = withErrorHandling(async (newData: any) => {
+  const handleAdvancedDataUpdate = useCallback(withErrorHandling(async (newData: any) => {
     updateAdvancedData({
       address: newData.address,
       roofAnalysis: newData.roofAnalysis,
@@ -58,9 +59,9 @@ const CalculadoraSolar = () => {
       coordinates: newData.coordinates
     });
     markStepCompleted(1);
-  }, 'Error actualizando datos del análisis avanzado');
+  }, 'Error actualizando datos del análisis avanzado'), [updateAdvancedData, markStepCompleted, withErrorHandling]);
 
-  const handleTechnicalStepNext = withErrorHandling(async () => {
+  const handleTechnicalStepNext = useCallback(withErrorHandling(async () => {
     // Update technical data based on REAL roof analysis
     if (advancedData.roofAnalysis) {
       const recommendedKwp = Math.min(advancedData.roofAnalysis.maxKwp * 0.85, 10);
@@ -80,10 +81,10 @@ const CalculadoraSolar = () => {
     }
     markStepCompleted(2);
     nextStep();
-  }, 'Error en el paso técnico');
+  }, 'Error en el paso técnico'), [advancedData.roofAnalysis, updateData, data.tecnico, markStepCompleted, nextStep, withErrorHandling]);
 
-  const calculateAdvancedResults = withErrorHandling(async () => {
-    if (!advancedData.roofAnalysis || !advancedData.consumptionPrediction) {
+  const calculateAdvancedResults = useCallback(withErrorHandling(async () => {
+    if (!calculationStatus.isReadyForCalculation) {
       throw new Error('Faltan datos necesarios para el cálculo. Complete el análisis del tejado y el perfil de consumo.');
     }
 
@@ -95,14 +96,15 @@ const CalculadoraSolar = () => {
     } else if (calculationError) {
       throw new Error('Error al calcular los resultados. Verifica que todos los datos estén disponibles.');
     }
-  }, 'Error calculando resultados avanzados');
+  }, 'Error calculando resultados avanzados'), [calculationStatus.isReadyForCalculation, calculatedResults, calculationError, updateAdvancedData, markStepCompleted, nextStep, withErrorHandling]);
 
-  const renderStep = () => {
+  // Memoized step renderer for better performance
+  const renderStep = useMemo(() => {
     switch (currentStep) {
       case 1:
         return (
           <ErrorBoundary>
-            <PasoAnalisisAvanzado
+            <OptimizedPasoAnalisisAvanzado
               onNext={nextStep}
               onPrev={prevStep}
               isLoading={isLoading}
@@ -146,7 +148,7 @@ const CalculadoraSolar = () => {
           </ErrorBoundary>
         ) : (
           <div className="card-premium text-center">
-            <LoadingSpinner 
+            <OptimizedLoadingSpinner 
               message="Calculando resultados con datos reales..." 
               size="lg"
             />
@@ -158,7 +160,7 @@ const CalculadoraSolar = () => {
       default:
         return null;
     }
-  };
+  }, [currentStep, nextStep, prevStep, isLoading, setIsLoading, handleAdvancedDataUpdate, data, updateData, handleTechnicalStepNext, calculateAdvancedResults, isCalculating, calculatedResults, resetCalculator, calculationError]);
 
   // Handle calculation errors
   React.useEffect(() => {
@@ -187,7 +189,7 @@ const CalculadoraSolar = () => {
             <StepIndicator currentStep={currentStep} totalSteps={4} />
             
             <div className="mt-8">
-              {renderStep()}
+              {renderStep}
             </div>
           </div>
         </div>
