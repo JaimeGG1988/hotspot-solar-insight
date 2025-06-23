@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { CalculadoraData, defaultCalculadoraData } from '../types/CalculadoraTypes';
-import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction } from '../types/AdvancedTypes';
+import { AddressDetails, RoofAnalysis, HouseholdProfile, ConsumptionPrediction, AdvancedResultsType } from '../types/AdvancedTypes';
 
 interface AdvancedData {
   address?: AddressDetails;
@@ -10,6 +10,7 @@ interface AdvancedData {
   consumptionPrediction?: ConsumptionPrediction;
   pvgisData?: any;
   coordinates?: [number, number];
+  advancedResults?: AdvancedResultsType;
 }
 
 export const useCalculatorData = () => {
