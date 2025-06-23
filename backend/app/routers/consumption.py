@@ -27,14 +27,15 @@ MOCK_PEAK_POWER_KW_CSV = MOCK_HOURLY_KWH_CSV * 3.5
     "/predict/manual",
     response_model=ConsumptionOutput,
     summary="Predict Energy Consumption from Manual Profile",
-    description="Predicts annual, monthly, and hourly energy consumption based on user-provided household characteristics."
+    description="Predicts annual, monthly, and hourly energy consumption based on user-provided household characteristics using heuristic models."
 )
 async def predict_consumption_manual(
     input_data: ConsumptionManualInput = Body(..., description="Manual profile data for consumption prediction.")
 ):
     """
-    Takes manual input about a household and returns an estimated energy consumption profile.
-    Currently, this endpoint returns **mocked data** as the underlying service logic is a placeholder.
+    Takes manual input about a household (occupants, area, EV, heat pump)
+    and returns an estimated energy consumption profile (annual, monthly, hourly, peak).
+    The prediction is based on heuristic models and standard consumption patterns.
     """
     logger.info(f"Received request for manual consumption prediction: {input_data.dict()}")
 
@@ -56,21 +57,23 @@ async def predict_consumption_manual(
     response_model=ConsumptionOutput,
     summary="Predict Energy Consumption from CSV File",
     description=(
-        "Predicts annual, monthly, and hourly energy consumption based on an uploaded CSV file "
-        "containing 8760 hourly consumption values (kWh).\n\n"
-        "The CSV file should contain a single column of numerical values representing kWh for each hour of the year, "
-        "or if multiple columns, the first one will be used. No header row is expected by default, "
-        "or it should be handled by the parsing logic.\n\n"
-        "**Separator Note:** The service will attempt to auto-detect common separators (`,`, `;`)."
+        "Processes an uploaded CSV file containing 8760 hourly consumption values (kWh) "
+        "to generate a detailed consumption profile (annual, monthly, hourly, peak).\n\n"
+        "**CSV File Format Requirements:**\n"
+        "- Exactly 8760 rows of numerical data (one for each hour of a standard year).\n"
+        "- Each value should represent consumption in kWh for that hour.\n"
+        "- Expected: A single column of data. If multiple columns are present, the first numeric one will be used.\n"
+        "- No header row is strictly expected by the parser, but it should tolerate one if present and numeric parsing still works.\n"
+        "- Common separators (`,`, `;`) and decimal formats (`.`, `,`) are auto-detected.\n"
+        "- File encoding: UTF-8 or Latin-1 recommended."
     )
 )
 async def predict_consumption_csv(
     file: UploadFile = File(..., description="CSV file with 8760 hourly consumption values (kWh).")
 ):
     """
-    Takes a CSV file with 8760 hourly consumption values, validates it, and returns the consumption profile.
-    Currently, this endpoint returns **mocked data** if the basic file check passes,
-    as the underlying service logic for CSV processing is a placeholder.
+    Takes a CSV file with 8760 hourly consumption values, validates its format and content,
+    parses the data, and returns the calculated consumption profile (annual, monthly, hourly, peak).
     """
     logger.info(f"Received request for CSV consumption prediction. Filename: {file.filename}, Content-Type: {file.content_type}")
 
