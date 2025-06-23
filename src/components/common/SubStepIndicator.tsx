@@ -19,7 +19,7 @@ const SubStepIndicator: React.FC<SubStepIndicatorProps> = ({
   return (
     <div className="flex items-center justify-center space-x-4 mb-8">
       {steps.map((step, index) => (
-        <React.Fragment key={step.id}>
+        <div key={step.id} className="flex items-center">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
             currentStep === step.id 
               ? 'bg-cobre-hotspot-plano text-white' 
@@ -30,11 +30,11 @@ const SubStepIndicator: React.FC<SubStepIndicatorProps> = ({
             {step.number}
           </div>
           {index < steps.length - 1 && (
-            <div className={`h-1 w-16 ${
+            <div className={`h-1 w-16 ml-4 ${
               completedSteps.includes(step.id) ? 'bg-green-500' : 'bg-white/20'
             }`}></div>
           )}
-        </React.Fragment>
+        </div>
       ))}
     </div>
   );

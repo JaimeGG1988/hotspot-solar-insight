@@ -6,12 +6,16 @@ import PasoAnalisisAvanzado from './steps/PasoAnalisisAvanzado';
 import PasoTecnico from './steps/PasoTecnico';
 import PasoEconomico from './steps/PasoEconomico';
 import AdvancedResults from './advanced/AdvancedResults';
+import ErrorBoundary from './common/ErrorBoundary';
+import LoadingSpinner from './common/LoadingSpinner';
 import { useCalculatorData } from '../hooks/useCalculatorData';
 import { useSolarResults } from '../hooks/useSolarCalculations';
 import { useWizardNavigation } from '../hooks/useWizardNavigation';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 
 const CalculadoraSolar = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const { handleError, withErrorHandling } = useErrorHandler();
   
   const {
     data,
@@ -44,7 +48,7 @@ const CalculadoraSolar = () => {
     advancedData.pvgisData
   );
 
-  const handleAdvancedDataUpdate = (newData: any) => {
+  const handleAdvancedDataUpdate = withErrorHandling(async (newData: any) => {
     updateAdvancedData({
       address: newData.address,
       roofAnalysis: newData.roofAnalysis,
@@ -54,9 +58,9 @@ const CalculadoraSolar = () => {
       coordinates: newData.coordinates
     });
     markStepCompleted(1);
-  };
+  }, 'Error actualizando datos del análisis avanzado');
 
-  const handleTechnicalStepNext = () => {
+  const handleTechnicalStepNext = withErrorHandling(async () => {
     // Update technical data based on REAL roof analysis
     if (advancedData.roofAnalysis) {
       const recommendedKwp = Math.min(advancedData.roofAnalysis.maxKwp * 0.85, 10);
@@ -76,13 +80,11 @@ const CalculadoraSolar = () => {
     }
     markStepCompleted(2);
     nextStep();
-  };
+  }, 'Error en el paso técnico');
 
-  const calculateAdvancedResults = async () => {
+  const calculateAdvancedResults = withErrorHandling(async () => {
     if (!advancedData.roofAnalysis || !advancedData.consumptionPrediction) {
-      console.error('Missing required data for calculations');
-      alert('Error: Faltan datos necesarios para el cálculo. Por favor, complete el análisis del tejado y el perfil de consumo.');
-      return;
+      throw new Error('Faltan datos necesarios para el cálculo. Complete el análisis del tejado y el perfil de consumo.');
     }
 
     // The calculation is handled by the useSolarResults hook
@@ -91,58 +93,65 @@ const CalculadoraSolar = () => {
       markStepCompleted(3);
       nextStep();
     } else if (calculationError) {
-      console.error('Error calculating results:', calculationError);
-      alert('Error al calcular los resultados. Por favor, verifica que todos los datos estén disponibles.');
+      throw new Error('Error al calcular los resultados. Verifica que todos los datos estén disponibles.');
     }
-  };
+  }, 'Error calculando resultados avanzados');
 
   const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
-          <PasoAnalisisAvanzado
-            onNext={nextStep}
-            onPrev={prevStep}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-            onDataUpdate={handleAdvancedDataUpdate}
-          />
+          <ErrorBoundary>
+            <PasoAnalisisAvanzado
+              onNext={nextStep}
+              onPrev={prevStep}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
+              onDataUpdate={handleAdvancedDataUpdate}
+            />
+          </ErrorBoundary>
         );
       case 2:
         return (
-          <PasoTecnico
-            data={data}
-            updateData={updateData}
-            onNext={handleTechnicalStepNext}
-            onPrev={prevStep}
-            isLoading={isLoading}
-          />
+          <ErrorBoundary>
+            <PasoTecnico
+              data={data}
+              updateData={updateData}
+              onNext={handleTechnicalStepNext}
+              onPrev={prevStep}
+              isLoading={isLoading}
+            />
+          </ErrorBoundary>
         );
       case 3:
         return (
-          <PasoEconomico
-            data={data}
-            updateData={updateData}
-            onNext={calculateAdvancedResults}
-            onPrev={prevStep}
-            isLoading={isCalculating}
-            setIsLoading={setIsLoading}
-          />
+          <ErrorBoundary>
+            <PasoEconomico
+              data={data}
+              updateData={updateData}
+              onNext={calculateAdvancedResults}
+              onPrev={prevStep}
+              isLoading={isCalculating}
+              setIsLoading={setIsLoading}
+            />
+          </ErrorBoundary>
         );
       case 4:
         return calculatedResults ? (
-          <AdvancedResults
-            results={calculatedResults}
-            onNewCalculation={resetCalculator}
-          />
+          <ErrorBoundary>
+            <AdvancedResults
+              results={calculatedResults}
+              onNewCalculation={resetCalculator}
+            />
+          </ErrorBoundary>
         ) : (
           <div className="card-premium text-center">
-            <div className="flex items-center justify-center space-x-3">
-              <div className="w-8 h-8 border-2 border-cobre-hotspot-plano/30 border-t-cobre-hotspot-plano rounded-full animate-spin"></div>
-              <p className="text-white">Calculando resultados con datos reales...</p>
-            </div>
+            <LoadingSpinner 
+              message="Calculando resultados con datos reales..." 
+              size="lg"
+            />
             {calculationError && (
-              <p className="text-red-400 mt-2">Error en el cálculo. Volviendo al paso anterior...</p>
+              <p className="text-red-400 mt-4">Error en el cálculo. Volviendo al paso anterior...</p>
             )}
           </div>
         );
@@ -154,9 +163,10 @@ const CalculadoraSolar = () => {
   // Handle calculation errors
   React.useEffect(() => {
     if (calculationError && currentStep === 4) {
+      handleError(calculationError, 'Error en los cálculos');
       setTimeout(() => prevStep(), 2000);
     }
-  }, [calculationError, currentStep, prevStep]);
+  }, [calculationError, currentStep, prevStep, handleError]);
 
   // Move to results when calculation is ready
   React.useEffect(() => {
@@ -168,19 +178,21 @@ const CalculadoraSolar = () => {
   }, [calculatedResults, currentStep, updateAdvancedData, markStepCompleted, nextStep]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-azul-hotspot via-azul-hotspot to-gris-hotspot-profundo">
-      <Header />
-      
-      <div className="container mx-auto px-4 pt-24 pb-12">
-        <div className="max-w-4xl mx-auto">
-          <StepIndicator currentStep={currentStep} totalSteps={4} />
-          
-          <div className="mt-8">
-            {renderStep()}
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-azul-hotspot via-azul-hotspot to-gris-hotspot-profundo">
+        <Header />
+        
+        <div className="container mx-auto px-4 pt-24 pb-12">
+          <div className="max-w-4xl mx-auto">
+            <StepIndicator currentStep={currentStep} totalSteps={4} />
+            
+            <div className="mt-8">
+              {renderStep()}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
