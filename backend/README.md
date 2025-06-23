@@ -64,6 +64,26 @@ Una vez que el servidor esté en funcionamiento:
 *   **Documentación Interactiva (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 *   **Documentación Alternativa (ReDoc):** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
+### Endpoints Principales
+
+*   `/location/analyze` (POST): Analiza una ubicación para su potencial solar.
+    *   Input: `{ "lat": float, "lng": float }`
+    *   Output: Detalles del tejado, sombreado, kWp máximos.
+*   `/consumption/predict/manual` (POST): Predice el consumo energético basado en un perfil manual.
+    *   Input: `{ "occupants": int, "area_m2": int, "has_ev": bool, "has_heat_pump": bool, "clp": Optional[str] }`
+    *   Output: Perfil de consumo anual, mensual y horario.
+*   `/consumption/predict/csv` (POST): Predice el consumo energético a partir de un archivo CSV.
+    *   Input: Un archivo CSV (`multipart/form-data`) con una única columna de 8760 valores horarios de consumo en kWh.
+    *   Output: Perfil de consumo anual, mensual y horario.
+
+    **Formato del archivo CSV para `/consumption/predict/csv`:**
+    *   El archivo debe contener exactamente 8760 filas.
+    *   Cada fila debe representar el consumo en kWh para una hora del año.
+    *   Se espera una única columna de datos numéricos. Si hay varias columnas, se intentará usar la primera.
+    *   No se espera una fila de encabezado por defecto.
+    *   Los separadores de columnas comunes (coma, punto y coma) y los separadores decimales (punto, coma) se intentarán detectar automáticamente.
+    *   Se recomienda codificación UTF-8 o Latin-1.
+
 ## Variables de Entorno
 
 La aplicación puede utilizar variables de entorno definidas en un archivo `.env` dentro del directorio `backend/`. Consulta `backend/.env.example` (si existe) o el código fuente (ej. `app/services/overpass_service.py`) para ver las variables que se pueden configurar.

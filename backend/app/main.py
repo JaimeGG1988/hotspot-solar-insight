@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Import routers
-from app.routers import location
+from app.routers import location, consumption # Added consumption router
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,6 +41,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(location.router, prefix="/location", tags=["Location Analysis"])
+app.include_router(consumption.router, prefix="/consumption", tags=["Consumption Prediction"])
 
 @app.get("/", tags=["Root"])
 async def read_root():
