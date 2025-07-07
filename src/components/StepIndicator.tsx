@@ -24,7 +24,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, totalSteps }
           const isCurrent = stepNumber === currentStep;
 
           return (
-            <React.Fragment key={stepNumber}>
+            <div key={stepNumber} className="flex items-center">
               <div className="flex flex-col items-center space-y-2">
                 {/* Círculo del paso */}
                 <div
@@ -80,7 +80,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, totalSteps }
                   ></div>
                 </div>
               )}
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
